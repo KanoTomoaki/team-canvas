@@ -13,3 +13,7 @@ void drawKano() {
   rect(100,100,200,200);
 }
 void drawHujisawa()
+void drawKano() { }
+
+void drawHujisawa() {fill(200,200)
+;  }
