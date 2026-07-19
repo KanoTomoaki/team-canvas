@@ -12,7 +12,7 @@ drawHujisawa();
 void drawKomoto() {fill(200,200); }
 void drawKano() { }
 =======
-void drawKomoto() { }
+void drawKomoto() {fill(2000,200); }
 void drawKano() { 
   rect(100,100,200,200);
 }
