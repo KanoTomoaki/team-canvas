@@ -12,4 +12,4 @@ void drawKomoto() { }
 void drawKano() { 
   rect(100,100,200,200);
 }
-void drawHujisawa(){}
+void drawHujisawa()
