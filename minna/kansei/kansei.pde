@@ -20,13 +20,13 @@ int TARGET_TAIJU_MIN = 30;         // 目標体重の最小値
 int TARGET_TAIJU_MAX = 80;         // 目標体重の最大値
 
 // --- カード排出率の設定（%） ---
-float MANJARO_RATE = 10.0;          // マンジャロの出現確率 (%)
-float JAM_MEAL_RATE = 10.0;         // 「ご飯を奢る」の出現確率 (%)
-float JAM_SLEEP_RATE = 10.0;        // 「睡眠薬」の出現確率 (%)
-float JAM_MANJARO_RATE = 10.0;      // 「マンジャロ注文」の出現確率 (%)
+float MANJARO_RATE = 15.0;          // マンジャロの出現確率 (%)
+float JAM_MEAL_RATE = 5.0;         // 「ご飯を奢る」の出現確率 (%)
+float JAM_SLEEP_RATE = 3.0;        // 「睡眠薬」の出現確率 (%)
+float JAM_MANJARO_RATE = 1.0;      // 「マンジャロ注文」の出現確率 (%)
 
 // --- カード使用演出の設定 ---
-float CARD_EFFECT_DURATION = 0.3;   // カードが消えるまでの秒数
+float CARD_EFFECT_DURATION = 0.5;   // カードが消えるまでの秒数
 float CARD_EFFECT_RISE = 60.0;     // 消えるまでに上へ移動する距離(px)
 
 // --- コンボ設定 ---
@@ -36,8 +36,10 @@ float COMBO_NOTICE_DURATION = 2.0;  // コンボ終了結果を表示する秒�
 // ==========================================
 // システム用変数定義
 // ==========================================
-// gameState: 0:タイトル, 1:メインゲーム, 2:ターンカットイン, 3:ランダムイベント演出, 4:結果発表
-int gameState = 0; 
+// gameState: 0:タイトル, 1:メインゲーム, 2:ターンカットイン, 3:ランダムイベント演出, 4:結果発表, 5:ルール説明
+int gameState = 0;
+int rulePage = 0;
+int RULE_PAGE_COUNT = 6; 
 int activePlayer = 0; // 0: P1, 1: P2
 int currentTurn = 1;
 int targetTaiju;
@@ -429,6 +431,8 @@ void draw() {
   
   if (gameState == 0) {
     drawTitle();
+  } else if (gameState == 5) {
+    drawRules();
   } else {
     drawGameUI();
     
@@ -902,7 +906,45 @@ void drawCardEffect(Card c, float x, float y, float w, float h, float alphaValue
 // ==========================================
 void mousePressed() {
   if (gameState == 0) {
-    startTurn(0);
+    // ゲームスタートボタン
+    if (mouseX >= width/2 - 150 && mouseX <= width/2 + 150 &&
+        mouseY >= 370 && mouseY <= 430) {
+      startTurn(0);
+      return;
+    }
+
+    // ルール説明ボタン
+    if (mouseX >= width/2 - 150 && mouseX <= width/2 + 150 &&
+        mouseY >= 455 && mouseY <= 515) {
+      rulePage = 0;
+      gameState = 5;
+      return;
+    }
+    return;
+  }
+
+  if (gameState == 5) {
+    // 左ページ
+    if (mouseX >= 85 && mouseX <= 185 && mouseY >= height - 95 && mouseY <= height - 35) {
+      rulePage--;
+      if (rulePage < 0) rulePage = RULE_PAGE_COUNT - 1;
+      return;
+    }
+
+    // 右ページ
+    if (mouseX >= width - 185 && mouseX <= width - 85 &&
+        mouseY >= height - 95 && mouseY <= height - 35) {
+      rulePage++;
+      if (rulePage >= RULE_PAGE_COUNT) rulePage = 0;
+      return;
+    }
+
+    // タイトルへ戻る
+    if (mouseX >= width/2 - 110 && mouseX <= width/2 + 110 &&
+        mouseY >= height - 95 && mouseY <= height - 35) {
+      gameState = 0;
+      return;
+    }
     return;
   }
   
@@ -1106,10 +1148,133 @@ void drawResult() {
 }
 
 void drawTitle() {
-  fill(0);
-  textSize(38);
-  text("二人対戦ダイエッターカードゲーム", width/2, 280);
-  textSize(20);
+  background(245, 248, 252);
+
+  fill(35, 55, 80);
+  textSize(42);
+  text("二人対戦ダイエッターカードゲーム", width/2, 230);
+
+  fill(90);
+  textSize(18);
+  text("健康的に目標体重を目指そう！", width/2, 290);
+
+  // ゲームスタートボタン
+  drawMenuButton(width/2 - 150, 370, 300, 60, "ゲームスタート");
+
+  // ルール説明ボタン
+  drawMenuButton(width/2 - 150, 455, 300, 60, "ルール説明");
+}
+
+void drawMenuButton(float x, float y, float w, float h, String label) {
+  boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+
+  stroke(60, 90, 130);
+  strokeWeight(2);
+  fill(hover ? color(210, 230, 250) : color(230, 240, 250));
+  rect(x, y, w, h, 12);
+
+  noStroke();
+  fill(35, 55, 80);
+  textSize(22);
+  text(label, x + w/2, y + h/2);
+}
+
+void drawRules() {
+  background(245, 248, 252);
+
+  fill(35, 55, 80);
+  textSize(34);
+  text("ルール説明", width/2, 50);
+
+  fill(255);
+  stroke(150);
+  strokeWeight(2);
+  rect(110, 95, width - 220, height - 225, 16);
+  noStroke();
+
+  String title = "";
+  String body = "";
+
+  if (rulePage == 0) {
+    title = "基本ルール";
+    body =
+      "・2人で交互にカードを使う対戦ゲームです。\n\n" +
+      "・各プレイヤーは10秒間、手札のカードを何枚でも使えます。\n\n" +
+      "・カードを使うたびに、新しいカードが1枚補充されます。\n\n" +
+      "・ターンが変わると、手札4枚はすべて入れ替わります。\n\n" +
+      "・最終ターン終了後、目標体重により近いプレイヤーが勝利です。\n\n" +
+      "・体重が0kg以下、またはストレスが100になると脱落します。";
+  } else if (rulePage == 1) {
+    title = "食事カード";
+    body =
+      "【サラダ】\n体重 -2 / 健康 +10 / ストレス -5\n\n" +
+      "【プロテイン】\n体重 +1 / 健康 +15\n\n" +
+      "【ケーキ】\n体重 +8 / 健康 -5 / ストレス -25\n\n" +
+      "同じ食事カテゴリーを連続で使うと、食事コンボが増えます。";
+  } else if (rulePage == 2) {
+    title = "運動カード";
+    body =
+      "【ウォーキング】\n体重 -3 / 健康 +5 / ストレス -5\n\n" +
+      "【ジム】\n体重 -6 / 健康 +12 / ストレス +10\n\n" +
+      "【ランニング】\n体重 -10 / 健康 -5 / ストレス +20\n\n" +
+      "同じ運動カテゴリーを連続で使うと、運動コンボが増えます。";
+  } else if (rulePage == 3) {
+    title = "生活カード";
+    body =
+      "【睡眠】\n健康 +20 / ストレス -20\n\n" +
+      "【水を飲む】\n体重 -1 / 健康 +5\n\n" +
+      "【夜更かし】\n体重 +2 / 健康 -15 / ストレス +15\n\n" +
+      "同じ生活カテゴリーを連続で使うと、生活コンボが増えます。";
+  } else if (rulePage == 4) {
+    title = "コンボシステム";
+    body =
+      "・食事・運動・生活カードだけがコンボ対象です。\n\n" +
+      "・同じカテゴリーを連続で使うと、コンボ数が増えます。\n\n" +
+      "・別の対象カテゴリーを使うとコンボが終了します。\n\n" +
+      "・終了時のコンボ数 × " + COMBO_WEIGHT_MULTIPLIER + "kgだけ、体重が減少します。\n\n" +
+      "例：3コンボで終了 → 体重 -" + (3 * COMBO_WEIGHT_MULTIPLIER) + "kg\n\n" +
+      "・特殊カードと妨害カードはコンボを増やさず、途切れさせません。";
+  } else if (rulePage == 5) {
+    title = "特殊・妨害・操作方法";
+    body =
+      "【特殊カード】\nリフレッシュ、チートデイ、マンジャロがあります。\n\n" +
+      "【妨害カード】\nご飯を奢る、睡眠薬、マンジャロ注文があります。\n相手の体重・制限時間・次の手札に影響します。\n\n" +
+      "【操作方法】\nPLAYER 1：左から 1・2・3・4キー\nPLAYER 2：左から 7・8・9・0キー\n\n" +
+      "カードはマウスクリックでも使用できます。";
+  }
+
+  fill(35, 55, 80);
+  textSize(28);
+  text(title, width/2, 135);
+
+  fill(40);
+  textSize(18);
+  textAlign(LEFT, TOP);
+  textLeading(29);
+  text(body, 165, 185, width - 330, height - 350);
+  textAlign(CENTER, CENTER);
+
+  // ページ表示
   fill(100);
-  text("画面をクリックしてスタート", width/2, 400);
+  textSize(16);
+  text((rulePage + 1) + " / " + RULE_PAGE_COUNT, width/2, height - 125);
+
+  // 左右ページボタンと戻るボタン
+  drawRuleButton(85, height - 95, 100, 60, "＜ 前へ");
+  drawRuleButton(width/2 - 110, height - 95, 220, 60, "タイトルへ戻る");
+  drawRuleButton(width - 185, height - 95, 100, 60, "次へ ＞");
+}
+
+void drawRuleButton(float x, float y, float w, float h, String label) {
+  boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+
+  stroke(80, 110, 145);
+  strokeWeight(2);
+  fill(hover ? color(205, 225, 245) : color(225, 238, 250));
+  rect(x, y, w, h, 10);
+
+  noStroke();
+  fill(35, 55, 80);
+  textSize(16);
+  text(label, x + w/2, y + h/2);
 }
