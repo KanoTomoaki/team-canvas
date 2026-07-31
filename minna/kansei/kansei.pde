@@ -74,6 +74,25 @@ HashMap<String, PImage> cardImages = new HashMap<String, PImage>();
 HashMap<Integer, PImage> player1Images = new HashMap<Integer, PImage>();
 HashMap<Integer, PImage> player2Images = new HashMap<Integer, PImage>();
 
+// エンディング画像
+// dataフォルダに同名のPNGを入れると、自動で結果画面に表示されます。
+PImage endingp1skinny;
+PImage endingp2skinny;
+PImage endingp1normal;
+PImage endingp2normal;
+PImage endingp1fat;
+PImage endingp2fat;
+PImage endingp1stress;
+PImage endingp2stress;
+PImage endingp1weight0;
+PImage endingp2weight0;
+PImage endingdraw;
+
+// ルール説明1ページ目に表示するゲーム画面スクショ
+// あとでdataフォルダへ画像を入れ、必要ならファイル名だけ変更してください。
+String RULE_GAME_SCREEN_FILE = "rule_game_screen.png";
+PImage ruleGameScreen;
+
 // ==========================================
 // 構造体・クラス定義
 // ==========================================
@@ -156,6 +175,10 @@ void setup() {
   loadCardImages();
   loadPlayerImages(player1Images, "p1_");
   loadPlayerImages(player2Images, "p2_");
+  loadEndingImages();
+
+  // ルール説明用ゲーム画面スクショを読み込み
+  ruleGameScreen = loadImage(RULE_GAME_SCREEN_FILE);
 
   hands[0] = new ArrayList<Card>();
   hands[1] = new ArrayList<Card>();
@@ -189,6 +212,90 @@ void loadPlayerImages(HashMap<Integer, PImage> map, String prefix) {
     PImage img = loadImage(prefix + w + ".png");
     if (img != null) map.put(w, img);
   }
+}
+
+// エンディング画像をまとめて読み込む関数
+// 画像は後からdataフォルダへ追加できます。
+void loadEndingImages() {
+  endingp1skinny = loadImage("endingp1skinny.png");
+  endingp2skinny = loadImage("endingp2skinny.png");
+
+  endingp1normal = loadImage("endingp1normal.png");
+  endingp2normal = loadImage("endingp2normal.png");
+
+  endingp1fat = loadImage("endingp1fat.png");
+  endingp2fat = loadImage("endingp2fat.png");
+
+  endingp1stress = loadImage("endingp1stress.png");
+  endingp2stress = loadImage("endingp2stress.png");
+
+  endingp1weight0 = loadImage("endingp1weight0.png");
+  endingp2weight0 = loadImage("endingp2weight0.png");
+
+  endingdraw = loadImage("endingdraw.png");
+}
+
+// エンディング画像を画面全体の背景として表示する関数
+// 縦横比を保ったまま、画面全体を覆うように表示します。
+void drawEndingImageInside(PImage img) {
+  if (img == null || img.width <= 0 || img.height <= 0) return;
+
+  // 画像全体が見えるように少し余白を付けて表示
+  float margin = 40;
+
+  float scaleValue = min(
+    (width - margin * 2.0f) / img.width,
+    (height - margin * 2.0f) / img.height
+  );
+
+  float drawW = img.width * scaleValue;
+  float drawH = img.height * scaleValue;
+
+  imageMode(CENTER);
+  image(img, width / 2, height / 2, drawW, drawH);
+  imageMode(CORNER);
+}
+
+// 勝敗と目標体重から、表示するエンディング画像を決める関数
+PImage getEndingImage() {
+  boolean p1Weight0 = taiju[0] <= 0;
+  boolean p2Weight0 = taiju[1] <= 0;
+  boolean p1Stress100 = stress[0] >= MAX_STRESS;
+  boolean p2Stress100 = stress[1] >= MAX_STRESS;
+
+  // 両者が同時に脱落した場合
+  if ((p1Weight0 || p1Stress100) && (p2Weight0 || p2Stress100)) {
+    return endingdraw;
+  }
+
+  // 体重0エンド
+  if (p1Weight0) return endingp1weight0;
+  if (p2Weight0) return endingp2weight0;
+
+  // ストレス100エンド
+  if (p1Stress100) return endingp1stress;
+  if (p2Stress100) return endingp2stress;
+
+  int diff1 = abs(taiju[0] - targetTaiju);
+  int diff2 = abs(taiju[1] - targetTaiju);
+
+  // 通常の引き分け
+  if (diff1 == diff2) return endingdraw;
+
+  int winner = (diff1 < diff2) ? 0 : 1;
+
+  // やせ目標：30～45kg
+  if (targetTaiju <= 45) {
+    return (winner == 0) ? endingp1skinny : endingp2skinny;
+  }
+
+  // 普通目標：46～60kg
+  if (targetTaiju <= 60) {
+    return (winner == 0) ? endingp1normal : endingp2normal;
+  }
+
+  // ふと目標：61～80kg
+  return (winner == 0) ? endingp1fat : endingp2fat;
 }
 
 // P1/P2 の描画処理を1つの関数に共通化
@@ -844,31 +951,59 @@ void useCard(int p, int cardIndex) {
 // 勝敗判定・結果表示 & タイトル/ルール
 // ==========================================
 void drawResult() {
-  fill(0, 200); rect(0, 0, width, height);
-  fill(255); textSize(44); text("GAME OVER", width/2, 140);
-  
+  // 1. プレイ画面を完全に消す
+  // 透明PNGの部分から直前のゲーム画面が見えないように、毎フレーム背景を消します。
+  background(0);
+
+  // 2. エンディング画像を背景として表示
+  PImage endingImage = getEndingImage();
+  drawEndingImageInside(endingImage);
+
+  // 3. 画像の上から黒の半透明レイヤーを重ねる
+  fill(0, 150);
+  rect(0, 0, width, height);
+
+  // 4. その上から文字を表示
+  fill(255);
+  textSize(44);
+  text("GAME OVER", width/2, 140);
+
   String winnerText = "";
   boolean p1Burst = (taiju[0] <= 0 || stress[0] >= MAX_STRESS);
   boolean p2Burst = (taiju[1] <= 0 || stress[1] >= MAX_STRESS);
-  
-  if (p1Burst && p2Burst) winnerText = "引き分け（両者脱落）";
-  else if (p1Burst) winnerText = "PLAYER 2 WIN! (PLAYER 1 脱落)";
-  else if (p2Burst) winnerText = "PLAYER 1 WIN! (PLAYER 2 脱落)";
-  else {
+
+  if (p1Burst && p2Burst) {
+    winnerText = "引き分け（両者脱落）";
+  } else if (p1Burst) {
+    winnerText = "PLAYER 2 WIN! (PLAYER 1 脱落)";
+  } else if (p2Burst) {
+    winnerText = "PLAYER 1 WIN! (PLAYER 2 脱落)";
+  } else {
     int diff1 = abs(taiju[0] - targetTaiju);
     int diff2 = abs(taiju[1] - targetTaiju);
-    if (diff1 < diff2) winnerText = "PLAYER 1 WIN!";
-    else if (diff2 < diff1) winnerText = "PLAYER 2 WIN!";
-    else winnerText = "引き分け!";
+
+    if (diff1 < diff2) {
+      winnerText = "PLAYER 1 WIN!";
+    } else if (diff2 < diff1) {
+      winnerText = "PLAYER 2 WIN!";
+    } else {
+      winnerText = "引き分け!";
+    }
   }
-  
-  fill(255, 255, 100); textSize(36); text(winnerText, width/2, 240);
-  fill(255); textSize(22);
+
+  fill(255, 255, 100);
+  textSize(36);
+  text(winnerText, width/2, 240);
+
+  fill(255);
+  textSize(22);
   text("目標体重: " + targetTaiju + " kg", width/2, 330);
   text("P1 最終体重: " + taiju[0] + " kg", width/2, 380);
   text("P2 最終体重: " + taiju[1] + " kg", width/2, 420);
-  
-  fill(150); textSize(16); text("クリックでタイトルへ戻る", width/2, 530);
+
+  fill(150);
+  textSize(16);
+  text("クリックでタイトルへ戻る", width/2, 530);
 }
 
 void drawTitle() {
@@ -892,49 +1027,908 @@ void drawMenuButton(float x, float y, float w, float h, String label) {
 
 void drawRules() {
   background(245, 248, 252);
-  fill(35, 55, 80); textSize(34); text("ルール説明", width/2, 50);
+  fill(35, 55, 80);
+  textSize(34);
+  text("ルール説明", width/2, 48);
 
-  fill(255); stroke(150); strokeWeight(2);
-  rect(110, 95, width - 220, height - 270, 16);
+  fill(255);
+  stroke(150);
+  strokeWeight(2);
+  rect(70, 88, width - 140, height - 235, 16);
   noStroke();
 
-  String title = "", body = "";
-
   if (rulePage == 0) {
-    title = "基本ルール";
-    body = "・2人で交互にカードを使う対戦ゲームです。\n\n" +
-           "・各プレイヤーは制限時間内、手札のカードを何枚でも使えます。\n\n" +
-           "・カードを使うたびに、新しいカードが1枚補充されます。\n\n" +
-           "・最終ターン終了後、健康値,ストレス値によってランダムに体重が増減します。\n\n" +
-           "・目標体重により近いプレイヤーが勝利です。\n\n" +
-           "・ゲーム中体重が0kg以下、またはストレスが100になると脱落します。";
+    drawRulePageBasic();
   } else if (rulePage == 1) {
-    title = "コンボシステム";
-    body = "・食事・運動・生活カードだけがコンボ対象です。\n\n" +
-           "・同じカテゴリーを連続で使うと、コンボ数が増えます。\n\n" +
-           "・別の対象カテゴリーを使うとコンボが終了します。\n\n" +
-           "・終了時のコンボ数 × " + COMBO_WEIGHT_MULTIPLIER + "kgだけ、体重が減少します。\n\n" +
-           "・特殊カードと妨害カードはコンボを途切れさせません。";
-  } else if (rulePage == 2) {
-    title = "特殊・妨害・操作方法";
-    body = "【特殊カード】\nリフレッシュ、チートデイ、マンジャロがあります。\n\n" +
-           "【妨害カード】\nご飯を奢る、睡眠薬、マンジャロ注文があります。\n\n" +
-           "【操作方法】\nPLAYER 1：1〜4キー (使用) / 5キーを押しながら1〜4 (ホールド入れ替え)\nPLAYER 2：7〜0キー (使用) / -キーを押しながら7〜0 (ホールド入れ替え)\n\n" +
-           "カードをドラッグ＆ドロップしてHOLD枠に置くことで入れ替えることもできます。";
+    drawRulePageCombo();
+  } else {
+    drawRulePageSpecialAndControls();
   }
 
-  fill(35, 55, 80); textSize(28); text(title, width/2, 135);
+  fill(100);
+  textSize(16);
+  text((rulePage + 1) + " / " + RULE_PAGE_COUNT, width/2, height - 120);
 
-  fill(40); textSize(18); textAlign(LEFT, TOP); textLeading(29);
-  text(body, 165, 185, width - 330, height - 350);
-  textAlign(CENTER, CENTER);
-
-  fill(100); textSize(16); text((rulePage + 1) + " / " + RULE_PAGE_COUNT, width/2, height - 125);
-
-  drawRuleButton(85, height - 95, 100, 60, "＜ 前へ");
-  drawRuleButton(width/2 - 110, height - 95, 220, 60, "タイトルへ戻る");
-  drawRuleButton(width - 185, height - 95, 100, 60, "次へ ＞");
+  drawRuleButton(70, height - 92, 120, 58, "＜ 前へ");
+  drawRuleButton(width/2 - 110, height - 92, 220, 58, "タイトルへ戻る");
+  drawRuleButton(width - 190, height - 92, 120, 58, "次へ ＞");
 }
+
+// 1ページ目：基本ルール
+void drawRulePageBasic() {
+  fill(35, 55, 80);
+  textSize(28);
+  text("ゲーム画面の見方", width / 2, 125);
+
+  // 左側：実際のゲーム画面
+  float boxX = 80;
+  float boxY = 155;
+  float boxW = 700;
+  float boxH = 380;
+
+  fill(245);
+  stroke(170);
+  strokeWeight(2);
+  rect(boxX, boxY, boxW, boxH, 12);
+  noStroke();
+
+  float imageW = boxW - 16;
+  float imageH = boxH - 16;
+
+  if (ruleGameScreen != null && ruleGameScreen.width > 0 && ruleGameScreen.height > 0) {
+    float scaleValue = min(
+      imageW / ruleGameScreen.width,
+      imageH / ruleGameScreen.height
+    );
+
+    float drawW = ruleGameScreen.width * scaleValue;
+    float drawH = ruleGameScreen.height * scaleValue;
+    float drawX = boxX + boxW / 2;
+    float drawY = boxY + boxH / 2;
+
+    imageMode(CENTER);
+    image(ruleGameScreen, drawX, drawY, drawW, drawH);
+    imageMode(CORNER);
+
+    // ②：PLAYER1・PLAYER2それぞれのタイマーの左横
+    drawRuleNumberMarker(
+      drawX - drawW * 0.25,
+      drawY - drawH * 0.39,
+      2,
+      color(0, 160, 145)
+    );
+    drawRuleNumberMarker(
+      drawX + drawW * 0.25,
+      drawY - drawH * 0.39,
+      2,
+      color(0, 160, 145)
+    );
+
+    // ③：各PLAYERの4枚のカードを、下側のかっこでまとめて表示
+    drawRuleCardBracket(
+      drawX - drawW * 0.45,
+      drawX - drawW * 0.04,
+      drawY + drawH * 0.43,
+      3,
+      color(255, 145, 40)
+    );
+    drawRuleCardBracket(
+      drawX + drawW * 0.04,
+      drawX + drawW * 0.45,
+      drawY + drawH * 0.43,
+      3,
+      color(255, 145, 40)
+    );
+
+    // ⑤：目標体重の左横
+    drawRuleNumberMarker(
+      drawX - drawW * 0.12,
+      drawY - drawH * 0.44,
+      5,
+      color(230, 80, 100)
+    );
+  } else {
+    fill(150);
+    textSize(18);
+    text("ゲーム画面の画像を入れてください", boxX + boxW / 2, boxY + boxH / 2);
+  }
+
+  // 右側：ゲームの流れ
+  float panelX = 805;
+  float panelY = 155;
+  float panelW = 395;
+  float panelH = 380;
+
+  fill(250);
+  stroke(180);
+  strokeWeight(2);
+  rect(panelX, panelY, panelW, panelH, 12);
+  noStroke();
+
+  fill(40, 70, 120);
+  textSize(23);
+  text("ゲームの流れ", panelX + panelW / 2, panelY + 27);
+
+  drawRuleTextItem(
+    panelX + 16, panelY + 55, panelW - 32, 46,
+    1, color(66, 133, 244),
+    "2人で交互にカードを使う対戦ゲームです。"
+  );
+
+  drawRuleTextItem(
+    panelX + 16, panelY + 105, panelW - 32, 58,
+    2, color(0, 160, 145),
+    "各プレイヤーは制限時間内、手札のカードを\n何枚でも使えます。"
+  );
+
+  drawRuleTextItem(
+    panelX + 16, panelY + 167, panelW - 32, 58,
+    3, color(255, 145, 40),
+    "カードを使うたびに、新しいカードが\n1枚補充されます。"
+  );
+
+  drawRuleTextItem(
+    panelX + 16, panelY + 229, panelW - 32, 58,
+    4, color(140, 90, 200),
+    "最終ターン終了後、健康値・ストレス値によって\nランダムに体重が増減します。"
+  );
+
+  drawRuleTextItem(
+    panelX + 16, panelY + 291, panelW - 32, 45,
+    5, color(230, 80, 100),
+    "目標体重により近いプレイヤーが勝利です。"
+  );
+
+  // 脱落条件
+  fill(255, 235, 238);
+  stroke(220, 70, 80);
+  strokeWeight(2);
+  rect(panelX + 16, panelY + 338, panelW - 32, 34, 8);
+  noStroke();
+
+  fill(205, 45, 55);
+  textSize(13);
+  textAlign(CENTER, CENTER);
+  text(
+    "【脱落条件】体重0kg以下 または ストレス100",
+    panelX + panelW / 2,
+    panelY + 355
+  );
+
+  textAlign(CENTER, CENTER);
+}
+
+
+// ルール画面上に表示する丸付き番号
+void drawRuleNumberMarker(float x, float y, int number, color markerColor) {
+  pushStyle();
+
+  stroke(255);
+  strokeWeight(3);
+  fill(markerColor);
+  ellipse(x, y, 34, 34);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(18);
+  text(number, x, y - 1);
+
+  popStyle();
+}
+
+
+// 4枚のカードを下側のかっこでまとめて示す
+void drawRuleCardBracket(
+  float leftX, float rightX, float y,
+  int number, color markerColor
+) {
+  pushStyle();
+
+  stroke(markerColor);
+  strokeWeight(4);
+  noFill();
+
+  // 下側のかっこ
+  line(leftX, y - 10, leftX, y);
+  line(leftX, y, rightX, y);
+  line(rightX, y, rightX, y - 10);
+
+  // かっこの中央に番号
+  float centerX = (leftX + rightX) / 2;
+  stroke(255);
+  strokeWeight(3);
+  fill(markerColor);
+  ellipse(centerX, y + 3, 34, 34);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(18);
+  text(number, centerX, y + 2);
+
+  popStyle();
+}
+
+
+// 脱落条件に関係する場所を示す警告マーク
+void drawRuleWarningMarker(float x, float y) {
+  pushStyle();
+
+  stroke(255);
+  strokeWeight(3);
+  fill(220, 55, 65);
+  ellipse(x, y, 30, 30);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(20);
+  text("!", x, y - 1);
+
+  popStyle();
+}
+
+
+// 右側の説明項目
+void drawRuleTextItem(
+  float x, float y, float w, float h,
+  int number, color markerColor, String message
+) {
+  pushStyle();
+
+  fill(255);
+  stroke(210, 215, 225);
+  strokeWeight(1);
+  rect(x, y, w, h, 8);
+  noStroke();
+
+  fill(markerColor);
+  ellipse(x + 20, y + h / 2, 28, 28);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(15);
+  text(number, x + 20, y + h / 2 - 1);
+
+  fill(45);
+  textAlign(LEFT, CENTER);
+  textSize(14);
+  text(message, x + 42, y + h / 2);
+
+  popStyle();
+}
+
+
+// ルール1ページ目の説明ボックス
+void drawRulePointBox(float x, float y, float w, float h, String title, String detail) {
+  fill(255);
+  stroke(190, 200, 215);
+  strokeWeight(1.5);
+  rect(x, y, w, h, 10);
+  noStroke();
+
+  textAlign(LEFT, CENTER);
+  fill(35, 55, 80);
+  textSize(18);
+  text(title, x + 14, y + 22);
+
+  fill(90);
+  textSize(14);
+  text(detail, x + 14, y + 49);
+  textAlign(CENTER, CENTER);
+}
+
+// ルール用のプレイヤー見本
+void drawRulePlayerSample(float cx, float cy, String label, String weightText) {
+  fill(255);
+  stroke(170);
+  strokeWeight(2);
+  rect(cx - 85, cy - 80, 170, 215, 10);
+  noStroke();
+
+  fill(80);
+  textSize(17);
+  text(label, cx, cy - 55);
+
+  // 人型アイコン
+  fill(235, 180, 170);
+  ellipse(cx, cy - 5, 50, 50);
+  fill(120, 160, 220);
+  rect(cx - 34, cy + 20, 68, 72, 12);
+
+  fill(40);
+  textSize(20);
+  text(weightText, cx, cy + 115);
+}
+
+// 2ページ目：コンボ
+void drawRulePageCombo() {
+  fill(35, 55, 80);
+  textSize(28);
+  text("コンボシステム", width / 2, 125);
+
+  // 上段カード：全体を少し右・少し上へ移動
+  float cardY = 145;
+  float cardW = 145;
+  float cardH = 225;
+
+  drawRuleGameStyleCard(
+    "サラダ", "salad.png",
+    -2, 10, -5,
+    CardType.MEAL,
+    100, cardY, cardW, cardH
+  );
+
+  drawRuleArrow(252, 257);
+
+  drawRuleGameStyleCard(
+    "プロテイン", "purotein.png",
+    1, 15, 0,
+    CardType.MEAL,
+    310, cardY, cardW, cardH
+  );
+
+  drawRuleArrow(462, 257);
+
+  drawRuleGameStyleCard(
+    "ケーキ", "cake.png",
+    8, -5, -25,
+    CardType.MEAL,
+    520, cardY, cardW, cardH
+  );
+
+  // 同じカテゴリー＝同じ背景色
+  fill(getCardColor(CardType.MEAL));
+  stroke(190, 120, 120);
+  strokeWeight(2);
+  rect(695, 145, 480, 42, 10);
+  noStroke();
+
+  fill(60);
+  textSize(17);
+  text("同じカテゴリーのカードは同じ色", 935, 166);
+
+  // コンボ結果
+  fill(255, 240, 180);
+  stroke(210, 165, 35);
+  strokeWeight(2);
+  rect(695, 200, 480, 170, 14);
+  noStroke();
+
+  fill(80);
+  textSize(18);
+  text("同じカテゴリーを3枚連続使用", 935, 230);
+
+  fill(230, 120, 20);
+  textSize(31);
+  text("3 COMBO！", 935, 272);
+
+  fill(50);
+  textSize(19);
+  text("コンボ終了時", 935, 315);
+
+  fill(0, 100, 190);
+  textSize(25);
+  text("体重 －" + (3 * COMBO_WEIGHT_MULTIPLIER) + "kg", 935, 346);
+
+  // 下段説明
+  fill(245);
+  stroke(180);
+  strokeWeight(2);
+  rect(100, 395, 1075, 165, 12);
+  noStroke();
+
+  fill(40);
+  textAlign(LEFT, TOP);
+  textSize(15);
+  text("・食事・運動・生活カードだけがコンボ対象です。", 130, 415);
+  text("・同じカテゴリーのカードを連続で使うと、コンボ数が増えます。", 130, 446);
+  text("・別の対象カテゴリーを使った時点で、コンボが終了します。", 130, 477);
+  text("・終了時のコンボ数 × " + COMBO_WEIGHT_MULTIPLIER + "kgだけ体重が減少します。", 130, 508);
+
+  fill(100, 60, 150);
+  textSize(13);
+  text("※特殊カードと妨害カードを使っても、コンボは途切れません。", 130, 536);
+
+  textAlign(CENTER, CENTER);
+}
+
+
+// ルール2ページ目専用：ゲーム内カードと同じ見た目
+// 画像ファイル名はdrawRulePageCombo()の第2引数で指定します
+void drawRuleGameStyleCard(
+  String cardName,
+  String imageFile,
+  int dTaiju,
+  int dHealth,
+  int dStress,
+  CardType category,
+  float x, float y,
+  float w, float h
+) {
+  pushStyle();
+
+  fill(getCardColor(category));
+  stroke(0);
+  strokeWeight(2);
+  rect(x, y, w, h, 8);
+
+  fill(0);
+  textAlign(CENTER, CENTER);
+  textSize(17);
+  text(cardName, x + w / 2, y + 23);
+
+  stroke(0, 50);
+  strokeWeight(1);
+  line(x + 8, y + 42, x + w - 8, y + 42);
+
+  // 専用関数からカード画像を取得
+  PImage ruleCardImage = getRuleCardImage(cardName, imageFile);
+
+  if (ruleCardImage != null && ruleCardImage.width > 0 && ruleCardImage.height > 0) {
+    float maxImageW = w - 20;
+    float maxImageH = 105;
+    float scaleValue = min(
+      maxImageW / ruleCardImage.width,
+      maxImageH / ruleCardImage.height
+    );
+
+    imageMode(CENTER);
+    image(
+      ruleCardImage,
+      x + w / 2,
+      y + 101,
+      ruleCardImage.width * scaleValue,
+      ruleCardImage.height * scaleValue
+    );
+    imageMode(CORNER);
+  } else {
+    fill(120);
+    textSize(11);
+    text("画像なし", x + w / 2, y + 101);
+  }
+
+  // 効果はゲーム内と同じく下に縦並び
+  float effectY = y + 163;
+  float lineHeight = 18;
+  int lineCount = 0;
+
+  textSize(13);
+
+  if (dTaiju != 0) {
+    fill(dTaiju < 0 ? #0064C8 : #C80000);
+    text(
+      "体重：" + (dTaiju > 0 ? "+" : "") + dTaiju,
+      x + w / 2,
+      effectY + lineCount * lineHeight
+    );
+    lineCount++;
+  }
+
+  if (dHealth != 0) {
+    fill(0, 120, 0);
+    text(
+      "健康：" + (dHealth > 0 ? "+" : "") + dHealth,
+      x + w / 2,
+      effectY + lineCount * lineHeight
+    );
+    lineCount++;
+  }
+
+  if (dStress != 0) {
+    fill(180, 0, 0);
+    text(
+      "ストレス：" + (dStress > 0 ? "+" : "") + dStress,
+      x + w / 2,
+      effectY + lineCount * lineHeight
+    );
+  }
+
+  popStyle();
+}
+
+
+// ルール画面に使う画像を読み込む関数
+// 例："サラダ", "salad.png"
+PImage getRuleCardImage(String cardName, String imageFile) {
+  // ゲーム内で既に読み込まれている画像を優先
+  PImage img = cardImages.get(cardName);
+
+  // 見つからない場合は、指定したファイル名から読み込む
+  if (img == null && imageFile != null && imageFile.length() > 0) {
+    img = loadImage(imageFile);
+  }
+
+  return img;
+}
+
+
+// ルール画面用のカード
+void drawRuleCategoryCard(String cardName, String category, float x, float y) {
+  fill(getCardColor(CardType.MEAL));
+  stroke(100);
+  strokeWeight(2);
+  rect(x, y, 170, 180, 10);
+  noStroke();
+
+  fill(35);
+  textSize(18);
+  text(category + "カード", x + 85, y + 23);
+  drawCardImage(cardName, x + 85, y + 92, 135, 105);
+
+  fill(50);
+  textSize(16);
+  text(cardName, x + 85, y + 158);
+}
+
+void drawRuleArrow(float x, float y) {
+  stroke(80);
+  strokeWeight(4);
+  line(x, y, x + 42, y);
+  line(x + 42, y, x + 29, y - 11);
+  line(x + 42, y, x + 29, y + 11);
+  noStroke();
+}
+
+// 3ページ目：特殊・妨害・操作方法
+void drawRulePageSpecialAndControls() {
+  fill(35, 55, 80);
+  textSize(28);
+  text("特殊・妨害・操作方法", width / 2, 125);
+
+  // カード全体を少し右へ移動
+  float cardShiftX = 25;
+
+  // 特殊カード
+  fill(70, 90, 120);
+  textSize(19);
+  text("特殊カード", 330 + cardShiftX, 155);
+
+  drawRuleSpecialCard(
+    "リフレッシュ", "refresh.png",
+    0, 10, -10,
+    105 + cardShiftX, 175, 135, 185
+  );
+
+  drawRuleSpecialCard(
+    "チートデイ", "cheat_day.png",
+    12, -30, -20,
+    265 + cardShiftX, 175, 135, 185
+  );
+
+  drawRuleSpecialCard(
+    "マンジャロ", "manjaro.png",
+    -30, -30, 70,
+    425 + cardShiftX, 175, 135, 185
+  );
+
+  // 妨害カード
+  fill(110, 50, 130);
+  textSize(19);
+  text("妨害カード", 905 + cardShiftX, 155);
+
+  drawRuleJamCard(
+    "ご飯を奢る", "meal_jam.png",
+    "相手の体重を増加",
+    680 + cardShiftX, 175, 135, 185
+  );
+
+  drawRuleJamCard(
+    "睡眠薬", "sleep_jam.png",
+    "相手の次ターンを\n5秒に短縮",
+    840 + cardShiftX, 175, 135, 185
+  );
+
+  drawRuleJamCard(
+    "マンジャロ注文", "manjaro_jam.png",
+    "相手の次の手札を\nマンジャロに固定",
+    1000 + cardShiftX, 175, 135, 185
+  );
+
+  // 下段：数字キーを横一列に表示
+  fill(238, 242, 248);
+  stroke(180);
+  strokeWeight(2);
+  rect(90, 385, 1110, 185, 12);
+  noStroke();
+
+  fill(35, 55, 80);
+  textSize(19);
+  text("操作キー", width / 2, 407);
+
+  drawRuleKeyboardRow(227, 430);
+
+  fill(80);
+  textSize(13);
+  text(
+    "カード使用：対応する数字キーを押す　　HOLD入れ替え：HOLDキーを押しながらカードキーを押す",
+    width / 2,
+    554
+  );
+
+  textAlign(CENTER, CENTER);
+}
+
+
+// 数字キーを横一列で表示
+void drawRuleKeyboardRow(float startX, float y) {
+  String[] keys = {
+    "1", "2", "3", "4", "5", "6",
+    "7", "8", "9", "0", "-"
+  };
+
+  float keyW = 66;
+  float keyH = 44;
+  float gap = 10;
+
+  for (int i = 0; i < keys.length; i++) {
+    float x = startX + i * (keyW + gap);
+
+    // 6キーは使用しないため薄く表示
+    if (keys[i].equals("6")) {
+      fill(225);
+      stroke(180);
+    } else {
+      fill(255);
+      stroke(80);
+    }
+
+    strokeWeight(2);
+    rect(x, y, keyW, keyH, 7);
+
+    fill(keys[i].equals("6") ? 155 : 35);
+    textAlign(CENTER, CENTER);
+    textSize(20);
+    text(keys[i], x + keyW / 2, y + keyH / 2 - 1);
+  }
+
+  // PLAYER 1：1～4キーをまとめる
+  float p1Left = startX;
+  float p1Right = startX + 3 * (keyW + gap) + keyW;
+  drawRulePlayerKeyGuide(
+    p1Left, p1Right, y + keyH + 5,
+    "PLAYER 1",
+    color(210, 70, 85),
+    keyW, gap
+  );
+
+  // PLAYER 1 HOLD：5キー
+  float p1HoldX = startX + 4 * (keyW + gap);
+  drawRuleHoldKeyGuide(
+    p1HoldX, y + keyH + 5, keyW,
+    "P1",
+    color(210, 70, 85)
+  );
+
+  // PLAYER 2：7～0キーをまとめる
+  float p2Left = startX + 6 * (keyW + gap);
+  float p2Right = startX + 9 * (keyW + gap) + keyW;
+  drawRulePlayerKeyGuide(
+    p2Left, p2Right, y + keyH + 5,
+    "PLAYER 2",
+    color(55, 135, 210),
+    keyW, gap
+  );
+
+  // PLAYER 2 HOLD：-キー
+  float p2HoldX = startX + 10 * (keyW + gap);
+  drawRuleHoldKeyGuide(
+    p2HoldX, y + keyH + 5, keyW,
+    "P2",
+    color(55, 135, 210)
+  );
+}
+
+
+// 1～4・7～0キーの下にPLAYER名とカード番号を表示
+void drawRulePlayerKeyGuide(
+  float leftX,
+  float rightX,
+  float y,
+  String playerLabel,
+  color guideColor,
+  float keyW,
+  float gap
+) {
+  pushStyle();
+
+  // キーをまとめる下側のかっこ
+  stroke(guideColor);
+  strokeWeight(3);
+  noFill();
+  line(leftX, y, leftX, y + 7);
+  line(leftX, y + 7, rightX, y + 7);
+  line(rightX, y + 7, rightX, y);
+
+  // PLAYER名をカード番号の上に表示
+  fill(guideColor);
+  noStroke();
+  textAlign(CENTER, TOP);
+  textSize(12);
+  text(playerLabel, (leftX + rightX) / 2, y + 9);
+
+  // 各キーが手札の何枚目かを表示
+  textSize(13);
+  for (int i = 0; i < 4; i++) {
+    float centerX = leftX + i * (keyW + gap) + keyW / 2;
+    text(str(i + 1), centerX, y + 28);
+  }
+
+  popStyle();
+}
+
+
+// HOLDキーの下にP1/P2、その下にHOLDを表示
+void drawRuleHoldKeyGuide(
+  float x,
+  float y,
+  float keyW,
+  String playerLabel,
+  color guideColor
+) {
+  pushStyle();
+
+  stroke(guideColor);
+  strokeWeight(3);
+  line(x, y + 7, x + keyW, y + 7);
+
+  fill(guideColor);
+  noStroke();
+  textAlign(CENTER, TOP);
+  textSize(11);
+  text(playerLabel, x + keyW / 2, y + 9);
+  text("HOLD", x + keyW / 2, y + 27);
+
+  popStyle();
+}
+
+
+// 特殊カード：画像と体重・健康・ストレスを表示
+// 画像ファイル名は第2引数で指定できます
+void drawRuleSpecialCard(
+  String cardName,
+  String imageFile,
+  int dTaiju,
+  int dHealth,
+  int dStress,
+  float x, float y,
+  float w, float h
+) {
+  pushStyle();
+
+  fill(getCardColor(CardType.SPECIAL));
+  stroke(70);
+  strokeWeight(2);
+  rect(x, y, w, h, 8);
+
+  fill(0);
+  textAlign(CENTER, CENTER);
+  textSize(15);
+  text(cardName, x + w / 2, y + 20);
+
+  stroke(0, 45);
+  strokeWeight(1);
+  line(x + 8, y + 38, x + w - 8, y + 38);
+
+  PImage img = getRulePage3Image(cardName, imageFile);
+  drawRulePage3Image(img, x + w / 2, y + 88, w - 20, 82);
+
+  float effectY = y + 137;
+  float lineHeight = 15;
+  int lineCount = 0;
+
+  textSize(11);
+
+  if (dTaiju != 0) {
+    fill(dTaiju < 0 ? #0064C8 : #C80000);
+    text(
+      "体重：" + (dTaiju > 0 ? "+" : "") + dTaiju,
+      x + w / 2,
+      effectY + lineCount * lineHeight
+    );
+    lineCount++;
+  }
+
+  if (dHealth != 0) {
+    fill(0, 120, 0);
+    text(
+      "健康：" + (dHealth > 0 ? "+" : "") + dHealth,
+      x + w / 2,
+      effectY + lineCount * lineHeight
+    );
+    lineCount++;
+  }
+
+  if (dStress != 0) {
+    fill(180, 0, 0);
+    text(
+      "ストレス：" + (dStress > 0 ? "+" : "") + dStress,
+      x + w / 2,
+      effectY + lineCount * lineHeight
+    );
+  }
+
+  popStyle();
+}
+
+
+// 妨害カード：画像と妨害効果を表示
+// 画像ファイル名は第2引数で指定できます
+void drawRuleJamCard(
+  String cardName,
+  String imageFile,
+  String effectText,
+  float x, float y,
+  float w, float h
+) {
+  pushStyle();
+
+  fill(getCardColor(CardType.JAM));
+  stroke(70);
+  strokeWeight(2);
+  rect(x, y, w, h, 8);
+
+  fill(0);
+  textAlign(CENTER, CENTER);
+  textSize(14);
+  text(cardName, x + w / 2, y + 20);
+
+  stroke(0, 45);
+  strokeWeight(1);
+  line(x + 8, y + 38, x + w - 8, y + 38);
+
+  PImage img = getRulePage3Image(cardName, imageFile);
+  drawRulePage3Image(img, x + w / 2, y + 88, w - 20, 82);
+
+  fill(120, 0, 120);
+  textSize(11);
+  text(effectText, x + w / 2, y + 151);
+
+  popStyle();
+}
+
+
+// 3ページ目の画像を取得する関数
+PImage getRulePage3Image(String cardName, String imageFile) {
+  PImage img = cardImages.get(cardName);
+
+  if (img == null && imageFile != null && imageFile.length() > 0) {
+    img = loadImage(imageFile);
+  }
+
+  return img;
+}
+
+
+// 画像をカード枠内に収めて表示する関数
+void drawRulePage3Image(
+  PImage img,
+  float centerX,
+  float centerY,
+  float maxW,
+  float maxH
+) {
+  if (img == null || img.width <= 0 || img.height <= 0) {
+    fill(120);
+    textSize(11);
+    text("画像なし", centerX, centerY);
+    return;
+  }
+
+  float scaleValue = min(
+    maxW / img.width,
+    maxH / img.height
+  );
+
+  imageMode(CENTER);
+  image(
+    img,
+    centerX,
+    centerY,
+    img.width * scaleValue,
+    img.height * scaleValue
+  );
+  imageMode(CORNER);
+}
+
 
 void drawRuleButton(float x, float y, float w, float h, String label) {
   boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
