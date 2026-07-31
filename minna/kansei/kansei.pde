@@ -25,6 +25,10 @@ float JAM_MEAL_RATE = 10.0;         // 「ご飯を奢る」の出現確率 (%)
 float JAM_SLEEP_RATE = 10.0;        // 「睡眠薬」の出現確率 (%)
 float JAM_MANJARO_RATE = 10.0;      // 「マンジャロ注文」の出現確率 (%)
 
+// --- カード使用演出の設定 ---
+float CARD_EFFECT_DURATION = 0.5;   // カードが消えるまでの秒数
+float CARD_EFFECT_RISE = 120.0;     // 消えるまでに上へ移動する距離(px)
+
 // ==========================================
 // システム用変数定義
 // ==========================================
@@ -58,6 +62,9 @@ ArrayList<String> eventLogs = new ArrayList<String>();
 ArrayList<Card>[] hands = new ArrayList[2];
 Card manjaroCard; // テンプレート用
 
+// カード使用時の演出
+ArrayList<CardEffect> cardEffects = new ArrayList<CardEffect>();
+
 // カード画像
 // スケッチフォルダ内に「data」フォルダを作り、画像を保存してください。
 HashMap<String, PImage> cardImages = new HashMap<String, PImage>();
@@ -84,6 +91,43 @@ class Card {
   
   Card(String n, CardType t, int jam) {
     name = n; type = t; dTaiju = 0; dHealth = 0; dStress = 0; jamType = jam;
+  }
+}
+
+// カード使用時の上昇・フェードアウト演出
+class CardEffect {
+  Card card;
+  float x, y, startY, w, h;
+  int startTime;
+
+  CardEffect(Card c, float startX, float startY, float cardW, float cardH) {
+    card = c;
+    x = startX;
+    y = startY;
+    this.startY = startY;
+    w = cardW;
+    h = cardH;
+    startTime = millis();
+  }
+
+  // 指定秒数に合わせて上昇位置を更新
+  void update() {
+    float elapsed = (millis() - startTime) / 1000.0;
+    float rate = constrain(elapsed / CARD_EFFECT_DURATION, 0, 1);
+    y = startY - CARD_EFFECT_RISE * rate;
+  }
+
+  // 指定秒数に合わせて徐々に透明にする
+  void display() {
+    float elapsed = (millis() - startTime) / 1000.0;
+    float rate = constrain(elapsed / CARD_EFFECT_DURATION, 0, 1);
+    float alphaValue = 255 * (1.0 - rate);
+    drawCardEffect(card, x, y, w, h, alphaValue);
+  }
+
+  boolean isFinished() {
+    float elapsed = (millis() - startTime) / 1000.0;
+    return elapsed >= CARD_EFFECT_DURATION;
   }
 }
 
@@ -271,7 +315,7 @@ void loadCardImage(String cardName, String fileName) {
 }
 
 void initCardPool() {
-  manjaroCard = new Card("マンジャロ", CardType.SPECIAL, -30, -30, 40);
+  manjaroCard = new Card("マンジャロ", CardType.SPECIAL, -30, -40, 40);
 
   // 食事
   cardPool.add(new Card("サラダ", CardType.MEAL, -2, 10, -5));
@@ -289,8 +333,8 @@ void initCardPool() {
   cardPool.add(new Card("夜更かし", CardType.LIFE, 2, -15, 15));
   
   // 特殊
-  cardPool.add(new Card("リフレッシュ", CardType.SPECIAL, 0, 10, -35));
-  cardPool.add(new Card("チートデイ", CardType.SPECIAL, 12, 30, -50));
+  cardPool.add(new Card("リフレッシュ", CardType.SPECIAL, 0, 10, -10));
+  cardPool.add(new Card("チートデイ", CardType.SPECIAL, 12, -10, -20));
   
   // 妨害
   cardPool.add(new Card("ご飯を奢る", CardType.JAM, 1));
@@ -322,13 +366,20 @@ void startTurn(int player) {
   activePlayer = player;
   gameState = 1;
   turnStartTime = millis();
-  
+
+  // ターン開始時に手札を全部交換
+  hands[activePlayer].clear();
+
+  // マンジャロ注文の効果を受けている場合
   if (isManjaroOnly[activePlayer]) {
-    hands[activePlayer].clear();
-    for (int j = 0; j < 4; j++) hands[activePlayer].add(manjaroCard);
+    for (int j = 0; j < 4; j++) {
+      hands[activePlayer].add(manjaroCard);
+    }
+    // このターンだけで効果終了
     isManjaroOnly[activePlayer] = false;
   } else {
-    while (hands[activePlayer].size() < 4) {
+    // 通常カードを新しく4枚引く
+    for (int j = 0; j < 4; j++) {
       hands[activePlayer].add(drawRandomCard(activePlayer));
     }
   }
@@ -375,6 +426,21 @@ void draw() {
       updateRandomEventCutin();
     } else if (gameState == 4) {
       drawResult();
+    }
+  }
+
+  // カード使用演出を最前面に描画
+  updateCardEffects();
+}
+
+void updateCardEffects() {
+  for (int i = cardEffects.size() - 1; i >= 0; i--) {
+    CardEffect effect = cardEffects.get(i);
+    effect.update();
+    effect.display();
+
+    if (effect.isFinished()) {
+      cardEffects.remove(i);
     }
   }
 }
@@ -720,6 +786,48 @@ void drawCard(Card c, float x, float y, float w, float h, boolean interactable) 
   }
 }
 
+// 演出専用：透明度を指定してカードを描画
+void drawCardEffect(Card c, float x, float y, float w, float h, float alphaValue) {
+  pushStyle();
+
+  color cardColor = color(230);
+  if (c.type == CardType.MEAL) cardColor = color(255, 220, 220);
+  else if (c.type == CardType.EXERCISE) cardColor = color(220, 255, 220);
+  else if (c.type == CardType.LIFE) cardColor = color(220, 220, 255);
+  else if (c.type == CardType.SPECIAL) cardColor = color(255, 255, 180);
+  else if (c.type == CardType.JAM) cardColor = color(230, 180, 255);
+
+  fill(red(cardColor), green(cardColor), blue(cardColor), alphaValue);
+  stroke(0, alphaValue);
+  strokeWeight(2);
+  rect(x, y, w, h, 8);
+
+  fill(0, alphaValue);
+  textSize(19);
+  text(c.name, x + w/2, y + 25);
+
+  stroke(0, alphaValue * 0.25);
+  strokeWeight(1);
+  line(x + 8, y + 42, x + w - 8, y + 42);
+
+  PImage img = cardImages.get(c.name);
+  if (img != null && img.width > 0 && img.height > 0) {
+    float maxImageW = w - 20;
+    float maxImageH = 82;
+    float scaleValue = min(maxImageW / img.width, maxImageH / img.height);
+    float drawW = img.width * scaleValue;
+    float drawH = img.height * scaleValue;
+
+    tint(255, alphaValue);
+    imageMode(CENTER);
+    image(img, x + w/2, y + 91, drawW, drawH);
+    imageMode(CORNER);
+    noTint();
+  }
+
+  popStyle();
+}
+
 // ==========================================
 // イベント入力処理
 // ==========================================
@@ -758,9 +866,49 @@ void mousePressed() {
   }
 }
 
+void keyPressed() {
+  // ゲーム中以外はカードを使えない
+  if (gameState != 1) return;
+
+  int cardIndex = -1;
+
+  // PLAYER 1：1・2・3・4キー
+  if (activePlayer == 0) {
+    if (key == '1') cardIndex = 0;
+    else if (key == '2') cardIndex = 1;
+    else if (key == '3') cardIndex = 2;
+    else if (key == '4') cardIndex = 3;
+  }
+
+  // PLAYER 2：7・8・9・0キー
+  else if (activePlayer == 1) {
+    if (key == '7') cardIndex = 0;
+    else if (key == '8') cardIndex = 1;
+    else if (key == '9') cardIndex = 2;
+    else if (key == '0') cardIndex = 3;
+  }
+
+  if (cardIndex >= 0 && cardIndex < hands[activePlayer].size()) {
+    useCard(activePlayer, cardIndex);
+  }
+}
+
 void useCard(int p, int cardIndex) {
   Card c = hands[p].get(cardIndex);
   int opp = (p == 0) ? 1 : 0;
+
+  // 選択したカードの画面上の位置を計算
+  float panelWidth = 600;
+  float panelX = (p == 0) ? 25 : 655;
+  float panelY = 85;
+  float cardW = 130;
+  float cardH = 220;
+  float cardSpacing = (panelWidth - 30 - (cardW * 4)) / 3;
+  float cardX = panelX + 15 + cardIndex * (cardW + cardSpacing);
+  float cardY = panelY + 235;
+
+  // カードが上昇しながら透明になる演出を開始
+  cardEffects.add(new CardEffect(c, cardX, cardY, cardW, cardH));
   
   if (c.type == CardType.JAM) {
     // 妨害演出：相手フィールドのポップアップのみセット
