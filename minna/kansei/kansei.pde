@@ -26,8 +26,12 @@ float JAM_SLEEP_RATE = 10.0;        // 「睡眠薬」の出現確率 (%)
 float JAM_MANJARO_RATE = 10.0;      // 「マンジャロ注文」の出現確率 (%)
 
 // --- カード使用演出の設定 ---
-float CARD_EFFECT_DURATION = 0.5;   // カードが消えるまでの秒数
-float CARD_EFFECT_RISE = 120.0;     // 消えるまでに上へ移動する距離(px)
+float CARD_EFFECT_DURATION = 0.3;   // カードが消えるまでの秒数
+float CARD_EFFECT_RISE = 60.0;     // 消えるまでに上へ移動する距離(px)
+
+// --- コンボ設定 ---
+int COMBO_WEIGHT_MULTIPLIER = 3;   // コンボが途切れた時に「コンボ数 × この値」kg減らす
+float COMBO_NOTICE_DURATION = 2.0;  // コンボ終了結果を表示する秒数
 
 // ==========================================
 // システム用変数定義
@@ -44,6 +48,12 @@ int[] health = new int[2];
 int[] stress = new int[2];
 float[] turnTimeLimit = new float[2]; // 次ターンの制限時間
 boolean[] isManjaroOnly = new boolean[2]; // 次ターンマンジャロ限定か
+
+// 食事・運動・生活カードのコンボ管理
+CardType[] lastComboType = new CardType[2];
+int[] comboCount = new int[2];
+String[] comboNoticeMessage = new String[2]; // コンボ終了時の体重増減表示
+int[] comboNoticeStartTime = new int[2];
 
 // 制限時間タイマー用
 int turnStartTime;
@@ -315,7 +325,7 @@ void loadCardImage(String cardName, String fileName) {
 }
 
 void initCardPool() {
-  manjaroCard = new Card("マンジャロ", CardType.SPECIAL, -30, -40, 40);
+  manjaroCard = new Card("マンジャロ", CardType.SPECIAL, -30, -30, 40);
 
   // 食事
   cardPool.add(new Card("サラダ", CardType.MEAL, -2, 10, -5));
@@ -333,8 +343,8 @@ void initCardPool() {
   cardPool.add(new Card("夜更かし", CardType.LIFE, 2, -15, 15));
   
   // 特殊
-  cardPool.add(new Card("リフレッシュ", CardType.SPECIAL, 0, 10, -10));
-  cardPool.add(new Card("チートデイ", CardType.SPECIAL, 12, -10, -20));
+  cardPool.add(new Card("リフレッシュ", CardType.SPECIAL, 0, 10, -35));
+  cardPool.add(new Card("チートデイ", CardType.SPECIAL, 12, 30, -50));
   
   // 妨害
   cardPool.add(new Card("ご飯を奢る", CardType.JAM, 1));
@@ -354,6 +364,10 @@ void resetGame() {
     turnTimeLimit[i] = NORMAL_TURN_TIME;
     isManjaroOnly[i] = false;
     jamNoticeMessage[i] = "";
+    lastComboType[i] = null;
+    comboCount[i] = 0;
+    comboNoticeMessage[i] = "";
+    comboNoticeStartTime[i] = 0;
     
     hands[i].clear();
     for (int j = 0; j < 4; j++) {
@@ -637,6 +651,9 @@ text("ストレス...", x+w/2, y+640);
     float cardX = x + 15 + i * (cardW + cardSpacing);
     drawCard(hands[p].get(i), cardX, cardY, cardW, cardH, isActive);
   }
+
+  // --- コンボ数とコンボ終了結果の表示 ---
+  drawComboStatus(p, x + 20, y + 55, 155, 105);
   
   // --- 相手フィールド内完結型の妨害通知ポップアップ ---
   if (!jamNoticeMessage[p].equals("")) {
@@ -658,6 +675,58 @@ text("ストレス...", x+w/2, y+640);
       jamNoticeMessage[p] = ""; // 表示終了
     }
   }
+}
+
+// コンボ数と、コンボ終了時の体重増減を表示
+void drawComboStatus(int p, float x, float y, float w, float h) {
+  pushStyle();
+
+  // コンボ表示用の枠
+  fill(255, 248, 210, 235);
+  stroke(230, 175, 30);
+  strokeWeight(2);
+  rect(x, y, w, h, 10);
+
+  fill(120, 75, 0);
+  textSize(14);
+  text("COMBO", x + w/2, y + 18);
+
+  // 現在続いているコンボ数
+  fill(230, 100, 20);
+  textSize(30);
+  text(comboCount[p], x + w/2, y + 49);
+
+  fill(90);
+  textSize(11);
+  if (lastComboType[p] == CardType.MEAL) {
+    text("食事コンボ継続中", x + w/2, y + 76);
+  } else if (lastComboType[p] == CardType.EXERCISE) {
+    text("運動コンボ継続中", x + w/2, y + 76);
+  } else if (lastComboType[p] == CardType.LIFE) {
+    text("生活コンボ継続中", x + w/2, y + 76);
+  } else {
+    text("対象カードを使用", x + w/2, y + 76);
+  }
+
+  // コンボが途切れた直後だけ体重増減を重ねて表示
+  if (!comboNoticeMessage[p].equals("")) {
+    float elapsed = (millis() - comboNoticeStartTime[p]) / 1000.0;
+
+    if (elapsed < COMBO_NOTICE_DURATION) {
+      fill(30, 30, 30, 230);
+      stroke(255, 210, 50);
+      strokeWeight(3);
+      rect(x - 5, y - 5, w + 10, h + 10, 12);
+
+      fill(255, 230, 70);
+      textSize(17);
+      text(comboNoticeMessage[p], x + w/2, y + h/2);
+    } else {
+      comboNoticeMessage[p] = "";
+    }
+  }
+
+  popStyle();
 }
 
 // 現在のステータス専用：太くて見やすい水平棒グラフ描画関数
@@ -893,6 +962,48 @@ void keyPressed() {
   }
 }
 
+// 食事・運動・生活カードだけをコンボ対象にする
+boolean isComboCategory(CardType type) {
+  return type == CardType.MEAL ||
+         type == CardType.EXERCISE ||
+         type == CardType.LIFE;
+}
+
+// 使用したカードに応じてコンボを更新する
+void updateCombo(int p, Card c) {
+  // 特殊・妨害カードはコンボに影響させない
+  if (!isComboCategory(c.type)) return;
+
+  // 最初の対象カード
+  if (lastComboType[p] == null) {
+    lastComboType[p] = c.type;
+    comboCount[p] = 1;
+    return;
+  }
+
+  // 同じカテゴリーならコンボ増加
+  if (lastComboType[p] == c.type) {
+    comboCount[p]++;
+    return;
+  }
+
+  // 別カテゴリーを使ったら、それまでのコンボが終了
+  // 同じカテゴリーを2枚以上連続使用した場合のみボーナスを適用
+  if (comboCount[p] >= 2) {
+    int finishedComboCount = comboCount[p];
+    int comboWeightLoss = finishedComboCount * COMBO_WEIGHT_MULTIPLIER;
+    taiju[p] -= comboWeightLoss;
+
+    // コンボが途切れた時点の結果を一定時間表示
+    comboNoticeMessage[p] = finishedComboCount + " COMBO終了！\n体重 -" + comboWeightLoss + "kg";
+    comboNoticeStartTime[p] = millis();
+  }
+
+  // 今回使ったカテゴリーから新しいコンボを開始
+  lastComboType[p] = c.type;
+  comboCount[p] = 1;
+}
+
 void useCard(int p, int cardIndex) {
   Card c = hands[p].get(cardIndex);
   int opp = (p == 0) ? 1 : 0;
@@ -909,6 +1020,9 @@ void useCard(int p, int cardIndex) {
 
   // カードが上昇しながら透明になる演出を開始
   cardEffects.add(new CardEffect(c, cardX, cardY, cardW, cardH));
+
+  // 食事・運動・生活カードだけコンボを更新
+  updateCombo(p, c);
   
   if (c.type == CardType.JAM) {
     // 妨害演出：相手フィールドのポップアップのみセット
