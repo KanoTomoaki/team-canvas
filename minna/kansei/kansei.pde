@@ -373,19 +373,19 @@ void drawHiddenPlayerImage(float centerX, float centerY, float maxW, float maxH,
 }
 
 void initCardPool() {
-  manjaroCard = new Card("マンジャロ", CardType.SPECIAL, -30, -30, 70);
+  manjaroCard = new Card("マンジャロ", CardType.SPECIAL, -30, -70, 70);
 
   cardPool.add(new Card("サラダ", CardType.MEAL, -2, 10, -5));
   cardPool.add(new Card("プロテイン", CardType.MEAL, 1, 15, 0));
   cardPool.add(new Card("ケーキ", CardType.MEAL, 8, -5, -10));
   cardPool.add(new Card("ウォーキング", CardType.EXERCISE, -3, 5, -5));
   cardPool.add(new Card("ジム", CardType.EXERCISE, -6, 12, 10));
-  cardPool.add(new Card("ランニング", CardType.EXERCISE, -10,  10, 20));
-  cardPool.add(new Card("睡眠", CardType.LIFE, 0, 20, -20));
+  cardPool.add(new Card("ランニング", CardType.EXERCISE, -10,  10, 0));
+  cardPool.add(new Card("睡眠", CardType.LIFE, 0, 20, -10));
   cardPool.add(new Card("水を飲む", CardType.LIFE, -1, 5, 0));
-  cardPool.add(new Card("夜更かし", CardType.LIFE, 2, -15, 15));
+  cardPool.add(new Card("夜更かし", CardType.LIFE, 0, -15, 25));
   cardPool.add(new Card("リフレッシュ", CardType.SPECIAL, 0, 10, -10));
-  cardPool.add(new Card("チートデイ", CardType.SPECIAL, 12, -30, -25));
+  cardPool.add(new Card("チートデイ", CardType.SPECIAL, 16, -30, -15));
   cardPool.add(new Card("ご飯を奢る", CardType.JAM, 1));
   cardPool.add(new Card("睡眠薬", CardType.JAM, 2));
   cardPool.add(new Card("マンジャロ注文", CardType.JAM, 3));
