@@ -1,3 +1,10 @@
+import processing.sound.*;
+
+SoundFile sound;
+SoundFile cardSound;
+SoundFile bgmSound; //BGM用の変数
+float bgmVolume = 0.5; //音量設定（0.0 ～ 1.0）
+
 // ==========================================
 // 各種初期パラメータ（設定・バランス調整用）
 // ==========================================
@@ -15,7 +22,10 @@ float COUNTDOWN_DURATION = 3.0;
 int TARGET_TAIJU_MIN = 30, TARGET_TAIJU_MAX = 80;
 
 // --- カード排出率の設定（%） ---
-float MANJARO_RATE = 8.0, JAM_MEAL_RATE = 5.0, JAM_SLEEP_RATE = 3.0, JAM_MANJARO_RATE = 1.0;
+float MANJARO_RATE = 6.0;
+float JAM_MEAL_RATE = 3.0;
+float JAM_SLEEP_RATE = 2.0;
+float JAM_MANJARO_RATE = 1.0;
 
 // --- カード使用演出の設定 ---
 float CARD_EFFECT_DURATION = 0.3;
@@ -28,7 +38,7 @@ float COMBO_POPUP_DURATION = 1.0;
 // ==========================================
 // システム用変数定義
 // ==========================================
-int gameState = 0, rulePage = 0, RULE_PAGE_COUNT = 3; 
+int gameState = 0, rulePage = 0, RULE_PAGE_COUNT = 3;
 int activePlayer = 0, currentTurn = 1, targetTaiju;
 
 // プレイヤーデータ [0]: P1, [1]: P2
@@ -96,7 +106,9 @@ PImage ruleGameScreen;
 // ==========================================
 // 構造体・クラス定義
 // ==========================================
-enum CardType { MEAL, EXERCISE, LIFE, SPECIAL, JAM }
+enum CardType {
+  MEAL, EXERCISE, LIFE, SPECIAL, JAM
+}
 
 class Card {
   String name;
@@ -104,11 +116,21 @@ class Card {
   int dTaiju, dHealth, dStress, jamType;
 
   Card(String n, CardType t, int dt, int dh, int ds) {
-    name = n; type = t; dTaiju = dt; dHealth = dh; dStress = ds; jamType = 0;
+    name = n;
+    type = t;
+    dTaiju = dt;
+    dHealth = dh;
+    dStress = ds;
+    jamType = 0;
   }
-  
+
   Card(String n, CardType t, int jam) {
-    name = n; type = t; dTaiju = 0; dHealth = 0; dStress = 0; jamType = jam;
+    name = n;
+    type = t;
+    dTaiju = 0;
+    dHealth = 0;
+    dStress = 0;
+    jamType = jam;
   }
 }
 
@@ -118,7 +140,12 @@ class CardEffect {
   int startTime;
 
   CardEffect(Card c, float startX, float startY, float cardW, float cardH) {
-    card = c; x = startX; y = startY; this.startY = startY; w = cardW; h = cardH;
+    card = c;
+    x = startX;
+    y = startY;
+    this.startY = startY;
+    w = cardW;
+    h = cardH;
     startTime = millis();
   }
 
@@ -139,8 +166,11 @@ class ComboEffect {
   int startTime;
 
   ComboEffect(float startX, float startY, String txt) {
-    x = startX; y = startY; this.startY = startY;
-    text = txt; startTime = millis();
+    x = startX;
+    y = startY;
+    this.startY = startY;
+    text = txt;
+    startTime = millis();
   }
 
   boolean updateAndDisplay() {
@@ -168,7 +198,9 @@ ArrayList<Card> cardPool = new ArrayList<Card>();
 void setup() {
   size(1280, 720);
   textAlign(CENTER, CENTER);
-  
+
+  playBgm("maou_bgm_8bit29.mp3", 0.1);
+
   String fontName = (platform == MACOSX) ? "Hiragino Sans" : "MS Gothic";
   textFont(createFont(fontName, 16));
 
@@ -184,7 +216,7 @@ void setup() {
   hands[1] = new ArrayList<Card>();
   jamNoticeMessage[0] = "";
   jamNoticeMessage[1] = "";
-  
+
   initCardPool();
   resetGame();
   gameState = 0;
@@ -246,7 +278,7 @@ void drawEndingImageInside(PImage img) {
   float scaleValue = min(
     (width - margin * 2.0f) / img.width,
     (height - margin * 2.0f) / img.height
-  );
+    );
 
   float drawW = img.width * scaleValue;
   float drawH = img.height * scaleValue;
@@ -310,9 +342,14 @@ void drawPlayerWeightImage(int p, float centerX, float centerY, float maxW, floa
   PImage img = map.get(imageWeight);
 
   if (img == null || img.width <= 0 || img.height <= 0) {
-    fill(220); stroke(170); rectMode(CENTER);
+    fill(220);
+    stroke(170);
+    rectMode(CENTER);
     rect(centerX, centerY, maxW, maxH, 8);
-    rectMode(CORNER); noStroke(); fill(100); textSize(12);
+    rectMode(CORNER);
+    noStroke();
+    fill(100);
+    textSize(12);
     text((p == 0 ? "p1_" : "p2_") + imageWeight + ".png", centerX, centerY);
     return;
   }
@@ -325,17 +362,23 @@ void drawPlayerWeightImage(int p, float centerX, float centerY, float maxW, floa
 void drawHiddenPlayerImage(float centerX, float centerY, float maxW, float maxH, String playerLabel) {
   pushStyle();
   rectMode(CENTER);
-  fill(40, 45, 60); stroke(100, 110, 130); strokeWeight(2);
+  fill(40, 45, 60);
+  stroke(100, 110, 130);
+  strokeWeight(2);
   rect(centerX, centerY, maxW, maxH, 10);
-  
-  noStroke(); fill(70, 80, 100);
-  ellipse(centerX, centerY - 25, 55, 55); 
-  arc(centerX, centerY + 45, 100, 90, PI, TWO_PI); 
-  
-  textAlign(CENTER, CENTER); textSize(32); fill(255, 220, 0, 220);
+
+  noStroke();
+  fill(70, 80, 100);
+  ellipse(centerX, centerY - 25, 55, 55);
+  arc(centerX, centerY + 45, 100, 90, PI, TWO_PI);
+
+  textAlign(CENTER, CENTER);
+  textSize(32);
+  fill(255, 220, 0, 220);
   text("???", centerX, centerY - 10);
-  
-  textSize(14); fill(180, 190, 210);
+
+  textSize(14);
+  fill(180, 190, 210);
   text(playerLabel + " UNKNOWN", centerX, centerY + 40);
   popStyle();
 }
@@ -361,22 +404,27 @@ void initCardPool() {
 
 void resetGame() {
   targetTaiju = (int)random(TARGET_TAIJU_MIN, TARGET_TAIJU_MAX + 1);
-  currentTurn = 1; activePlayer = 0;
-  key5Pressed = false; keyMinusPressed = false;
-  isDragging = false; draggedCardIndex = -1;
-  
+  currentTurn = 1;
+  activePlayer = 0;
+  key5Pressed = false;
+  keyMinusPressed = false;
+  isDragging = false;
+  draggedCardIndex = -1;
+
   cardEffects.clear();
   comboEffects.clear();
 
   for (int i = 0; i < 2; i++) {
-    taiju[i] = INIT_TAIJU; health[i] = INIT_HEALTH; stress[i] = INIT_STRESS;
+    taiju[i] = INIT_TAIJU;
+    health[i] = INIT_HEALTH;
+    stress[i] = INIT_STRESS;
     turnTimeLimit[i] = NORMAL_TURN_TIME;
     isManjaroOnly[i] = false;
     jamNoticeMessage[i] = "";
     lastComboType[i] = null;
     comboCount[i] = 0;
     heldCards[i] = null;
-    
+
     hands[i].clear();
     for (int j = 0; j < 4; j++) hands[i].add(drawRandomCard(i));
   }
@@ -392,8 +440,10 @@ void startTurn(int player) {
   activePlayer = player;
   gameState = 1;
   turnStartTime = millis();
-  key5Pressed = false; keyMinusPressed = false;
-  isDragging = false; draggedCardIndex = -1;
+  key5Pressed = false;
+  keyMinusPressed = false;
+  isDragging = false;
+  draggedCardIndex = -1;
 
   hands[activePlayer].clear();
   boolean manjaro = isManjaroOnly[activePlayer];
@@ -418,7 +468,7 @@ Card drawRandomCard(int p) {
 // ==========================================
 void draw() {
   background(240);
-  
+
   if (gameState == 0) drawTitle();
   else if (gameState == 5) drawRules();
   else {
@@ -437,7 +487,7 @@ void draw() {
   for (int i = comboEffects.size() - 1; i >= 0; i--) {
     if (comboEffects.get(i).updateAndDisplay()) comboEffects.remove(i);
   }
-  
+
   if (gameState == 1 && isDragging && draggedCardIndex != -1) {
     drawDraggedCard();
   }
@@ -445,14 +495,25 @@ void draw() {
 
 void updateCountdownCutin() {
   float elapsed = (millis() - countdownStartTime) * 0.001;
-  fill(0, 190); rect(0, 0, width, height);
-  fill(255); textSize(28);
+  fill(0, 190);
+  rect(0, 0, width, height);
+  fill(255);
+  textSize(28);
   text("TARGET WEIGHT: " + targetTaiju + " kg", width/2, height/2 - 120);
 
-  if (elapsed < 1.0) { fill(255, 220, 50); textSize(110); text("3", width/2, height/2); }
-  else if (elapsed < 2.0) { fill(255, 180, 50); textSize(110); text("2", width/2, height/2); }
-  else if (elapsed < 3.0) { fill(255, 100, 50); textSize(110); text("1", width/2, height/2); }
-  else startTurn(0);
+  if (elapsed < 1.0) {
+    fill(255, 220, 50);
+    textSize(110);
+    text("3", width/2, height/2);
+  } else if (elapsed < 2.0) {
+    fill(255, 180, 50);
+    textSize(110);
+    text("2", width/2, height/2);
+  } else if (elapsed < 3.0) {
+    fill(255, 100, 50);
+    textSize(110);
+    text("1", width/2, height/2);
+  } else startTurn(0);
 }
 
 void updateTurn() {
@@ -482,10 +543,12 @@ void endTurn() {
 }
 
 void updateCutin() {
-  fill(0, 180); rect(0, height/2 - 50, width, 100);
-  fill(255); textSize(36);
+  fill(0, 180);
+  rect(0, height/2 - 50, width, 100);
+  fill(255);
+  textSize(36);
   text(cutinMessage, width/2, height/2);
-  
+
   if ((millis() - cutinStartTime) * 0.001 >= CUTIN_DURATION) {
     if (cutinMessage.charAt(0) == 'P') startTurn(1);
     else startTurn(0);
@@ -496,11 +559,11 @@ void triggerRandomEvents() {
   gameState = 3;
   eventStartTime = millis();
   eventLogs.clear();
-  
+
   for (int i = 0; i < 2; i++) {
     String pName = "P" + (i + 1);
     boolean occurred = false;
-    
+
     if (random(100) < health[i]) {
       int weightLoss = (int)random(3, 10);
       taiju[i] -= weightLoss;
@@ -518,17 +581,21 @@ void triggerRandomEvents() {
 }
 
 void updateRandomEventCutin() {
-  fill(0, 210); rect(0, 0, width, height);
-  fill(255, 200, 0); textSize(36);
+  fill(0, 210);
+  rect(0, 0, width, height);
+  fill(255, 200, 0);
+  textSize(36);
   text("★ 最終体調チェック（ランダムイベント） ★", width/2, 180);
-  
-  fill(255); textSize(22);
+
+  fill(255);
+  textSize(22);
   for (int i = 0; i < eventLogs.size(); i++) {
     text(eventLogs.get(i), width/2, 280 + (i * 60));
   }
-  fill(180); textSize(16);
+  fill(180);
+  textSize(16);
   text("集計中...", width/2, 560);
-  
+
   if ((millis() - eventStartTime) * 0.001 >= EVENT_DURATION) {
     if (!checkInstantLoss()) gameState = 4;
   }
@@ -548,8 +615,10 @@ boolean checkInstantLoss() {
 // 画面UIレイアウト更新
 // ==========================================
 void drawGameUI() {
-  fill(220); rect(width/2 - 140, 10, 280, 65, 10);
-  fill(0); textSize(18);
+  fill(220);
+  rect(width/2 - 140, 10, 280, 65, 10);
+  fill(0);
+  textSize(18);
   text("目標体重: " + targetTaiju + " kg", width/2, 28);
   text("TURN: " + currentTurn + " / " + MAX_TURNS, width/2, 54);
 
@@ -559,21 +628,23 @@ void drawGameUI() {
 
 void drawPlayerPanel(int p, float x, float y, float w, float h) {
   boolean isActive = (p == activePlayer && gameState == 1);
-  
+
   stroke(isActive ? #FF3C3C : 180);
   strokeWeight(isActive ? 4 : 1);
   fill(isActive ? #FFFFF2 : 250);
   rect(x, y, w, h, 12);
   noStroke();
-  
-  fill(0); textSize(20);
+
+  fill(0);
+  textSize(20);
   text("PLAYER " + (p + 1), x + w/2, y + 22);
 
   float timeBarY = y + 36, timeBarMargin = 15;
   float timeBarW = w - (timeBarMargin * 2), timeBarH = 8;
-  
-  fill(220); rect(x + timeBarMargin, timeBarY, timeBarW, timeBarH, 4);
-  
+
+  fill(220);
+  rect(x + timeBarMargin, timeBarY, timeBarW, timeBarH, 4);
+
   if (isActive) {
     float elapsed = (millis() - turnStartTime) * 0.001;
     float remaining = max(0, turnTimeLimit[activePlayer] - elapsed);
@@ -588,11 +659,12 @@ void drawPlayerPanel(int p, float x, float y, float w, float h) {
   float cardW = 130, cardH = 310;
   float cardSpacing = (w - 30 - (cardW * 4)) / 3;
   float cardY = y + 280;
-  
+
   for (int i = 0; i < hands[p].size(); i++) {
     float cardX = x + 15 + i * (cardW + cardSpacing);
     if (isActive && isDragging && draggedCardIndex == i) {
-      pushStyle(); tint(255, 100);
+      pushStyle();
+      tint(255, 100);
       drawCard(hands[p].get(i), cardX, cardY, cardW, cardH);
       popStyle();
     } else {
@@ -602,12 +674,16 @@ void drawPlayerPanel(int p, float x, float y, float w, float h) {
 
   if (!jamNoticeMessage[p].isEmpty()) {
     if ((millis() - jamNoticeStartTime[p]) * 0.001 < JAM_NOTICE_DURATION) {
-      fill(180, 0, 0, 200); stroke(255, 0, 0); strokeWeight(3);
+      fill(180, 0, 0, 200);
+      stroke(255, 0, 0);
+      strokeWeight(3);
       rect(x + 10, y + 10, w - 20, h - 20, 10);
-      
-      fill(255, 255, 0); textSize(22);
+
+      fill(255, 255, 0);
+      textSize(22);
       text("【妨害発生!】", x + w/2, y + h/2 - 20);
-      fill(255); textSize(18);
+      fill(255);
+      textSize(18);
       text(jamNoticeMessage[p], x + w/2, y + h/2 + 20);
     } else {
       jamNoticeMessage[p] = "";
@@ -620,7 +696,8 @@ void drawDraggedCard() {
   float drawX = mouseX - dragOffsetX, drawY = mouseY - dragOffsetY;
 
   pushStyle();
-  fill(0, 50); noStroke();
+  fill(0, 50);
+  noStroke();
   rect(drawX + 8, drawY + 8, 130, 310, 8);
   drawCard(hands[activePlayer].get(draggedCardIndex), drawX, drawY, 130, 310);
   popStyle();
@@ -628,85 +705,122 @@ void drawDraggedCard() {
 
 color getCardColor(CardType type) {
   switch (type) {
-    case MEAL: return color(255, 220, 220);
-    case EXERCISE: return color(220, 255, 220);
-    case LIFE: return color(220, 220, 255);
-    case SPECIAL: return color(255, 255, 180);
-    case JAM: return color(230, 180, 255);
-    default: return color(230);
+  case MEAL:
+    return color(255, 220, 220);
+  case EXERCISE:
+    return color(220, 255, 220);
+  case LIFE:
+    return color(220, 220, 255);
+  case SPECIAL:
+    return color(255, 255, 180);
+  case JAM:
+    return color(230, 180, 255);
+  default:
+    return color(230);
   }
 }
 
 void drawHoldSlot(int p, float x, float y, float w, float h, boolean isActive) {
   pushStyle();
-  fill(60, 70, 90); textSize(14); textAlign(CENTER, BOTTOM);
+  fill(60, 70, 90);
+  textSize(14);
+  textAlign(CENTER, BOTTOM);
   text("HOLD", x + w/2, y);
 
-  stroke(isActive ? #FF9600 : 160); strokeWeight(2);
+  stroke(isActive ? #FF9600 : 160);
+  strokeWeight(2);
   fill(240, 240, 245);
   rect(x, y, w, h, 8);
 
-  fill(80); textSize(11); textAlign(CENTER, TOP);
+  fill(80);
+  textSize(11);
+  textAlign(CENTER, TOP);
   text((p == 0) ? "[5 + 1～4]" : "[= + 7～0]", x + w/2, y + 6);
 
   Card hc = heldCards[p];
   if (hc == null) {
-    fill(160); textSize(11); textAlign(CENTER, CENTER);
+    fill(160);
+    textSize(11);
+    textAlign(CENTER, CENTER);
     text("空き\n\n(D&Dで交換)", x + w/2, y + h/2);
   } else {
-    fill(getCardColor(hc.type)); stroke(100); strokeWeight(1);
+    fill(getCardColor(hc.type));
+    stroke(100);
+    strokeWeight(1);
     rect(x + 5, y + 22, w - 10, h - 28, 5);
 
-    fill(0); textSize(13); textAlign(CENTER, TOP);
+    fill(0);
+    textSize(13);
+    textAlign(CENTER, TOP);
     text(hc.name, x + w/2, y + 26);
 
     drawCardImage(hc.name, x + w/2, y + 95, w - 20, 80);
 
-    textSize(11); textAlign(CENTER, BOTTOM);
+    textSize(11);
+    textAlign(CENTER, BOTTOM);
     if (hc.type == CardType.JAM) {
-      fill(120, 0, 120); text("【妨害】", x + w/2, y + h - 10);
+      fill(120, 0, 120);
+      text("【妨害】", x + w/2, y + h - 10);
     } else {
       String statText = "";
       if (hc.dTaiju != 0) statText += (hc.dTaiju > 0 ? "+" : "") + hc.dTaiju + "kg\n";
       if (hc.dHealth != 0) statText += "健" + (hc.dHealth > 0 ? "+" : "") + hc.dHealth + " ";
       if (hc.dStress != 0) statText += "ス" + (hc.dStress > 0 ? "+" : "") + hc.dStress;
-      fill(40); text(statText, x + w/2, y + h - 8);
+      fill(40);
+      text(statText, x + w/2, y + h - 8);
     }
   }
   popStyle();
 }
 
 void drawCurrentHorizontalBarGraph(int p, float gx, float gy, float gw, float gh) {
-  fill(235); stroke(200); strokeWeight(1);
+  fill(235);
+  stroke(200);
+  strokeWeight(1);
   rect(gx, gy, gw, gh, 8);
-  
+
   float barX = gx + 12, barW = gw - 24, barH = 22;
   float targetX = map(targetTaiju, 0, 150, barX, barX + barW);
-  
-  fill(255, 230, 0, 100); rect(targetX - 2, gy + 5, 4, gh - 10); 
-  stroke(220, 180, 0); strokeWeight(2); line(targetX, gy + 2, targetX, gy + gh - 2); 
+
+  fill(255, 230, 0, 100);
+  rect(targetX - 2, gy + 5, 4, gh - 10);
+  stroke(220, 180, 0);
+  strokeWeight(2);
+  line(targetX, gy + 2, targetX, gy + gh - 2);
   noStroke();
 
   if (currentTurn >= 4) {
-    fill(200); rect(barX, gy + 32, barW, barH, 4);
+    fill(200);
+    rect(barX, gy + 32, barW, barH, 4);
     fill(120, 100);
     rect(barX, gy + 32, (sin(frameCount * 0.1) * 0.5 + 0.5) * barW, barH, 4);
 
-    textAlign(LEFT, CENTER); textSize(12); fill(80);
+    textAlign(LEFT, CENTER);
+    textSize(12);
+    fill(80);
     text("体重: ??? kg", barX + 8, gy + 32 + barH/2);
   } else {
-    fill(60); rect(barX, gy + 32, map(constrain(taiju[p], 0, 150), 0, 150, 0, barW), barH, 4);
-    textAlign(LEFT, CENTER); textSize(12); fill(255);
+    fill(60);
+    rect(barX, gy + 32, map(constrain(taiju[p], 0, 150), 0, 150, 0, barW), barH, 4);
+    textAlign(LEFT, CENTER);
+    textSize(12);
+    fill(255);
     text("体重: " + taiju[p] + " kg", barX + 8, gy + 32 + barH/2);
   }
 
-  fill(40, 180, 70); rect(barX, gy + 86, map(constrain(health[p], 0, 100), 0, 100, 0, barW), barH, 4);
-  fill(220, 60, 60); rect(barX, gy + 140, map(constrain(stress[p], 0, 100), 0, 100, 0, barW), barH, 4);
+  fill(40, 180, 70);
+  rect(barX, gy + 86, map(constrain(health[p], 0, 100), 0, 100, 0, barW), barH, 4);
+  fill(220, 60, 60);
+  rect(barX, gy + 140, map(constrain(stress[p], 0, 100), 0, 100, 0, barW), barH, 4);
 
-  fill(160, 120, 0); textSize(11); textAlign(CENTER, CENTER);
+  fill(160, 120, 0);
+  textSize(11);
+  textAlign(CENTER, CENTER);
   text("目標:" + targetTaiju + "kg", targetX, gy + 14);
 
-  textAlign(LEFT, CENTER); textSize(12); fill(255);
+  textAlign(LEFT, CENTER);
+  textSize(12);
+  fill(255);
   text("健康: " + health[p] + " %", barX + 8, gy + 86 + barH/2);
   text("ストレス: " + stress[p] + " %", barX + 8, gy + 140 + barH/2);
   textAlign(CENTER, CENTER);
@@ -723,11 +837,17 @@ void drawCardImage(String cardName, float centerX, float centerY, float maxW, fl
 }
 
 void drawCard(Card c, float x, float y, float w, float h) {
-  fill(getCardColor(c.type)); stroke(0); strokeWeight(2);
+  fill(getCardColor(c.type));
+  stroke(0);
+  strokeWeight(2);
   rect(x, y, w, h, 8);
-  
-  fill(0); textSize(18); text(c.name, x + w/2, y + 25);
-  stroke(0, 50); strokeWeight(1); line(x + 8, y + 42, x + w - 8, y + 42);
+
+  fill(0);
+  textSize(18);
+  text(c.name, x + w/2, y + 25);
+  stroke(0, 50);
+  strokeWeight(1);
+  line(x + 8, y + 42, x + w - 8, y + 42);
 
   drawCardImage(c.name, x + w/2, y + 120, w - 16, 130);
 
@@ -739,7 +859,7 @@ void drawCard(Card c, float x, float y, float w, float h) {
   } else {
     float startY = y + 210, lineHeight = 22;
     int lineCount = 0;
-    
+
     if (c.dTaiju != 0) {
       fill(c.dTaiju < 0 ? #0064C8 : #C80000);
       text("体重: " + (c.dTaiju > 0 ? "+" : "") + c.dTaiju, x + w/2, startY + (lineCount++ * lineHeight));
@@ -758,18 +878,25 @@ void drawCard(Card c, float x, float y, float w, float h) {
 void drawCardEffect(Card c, float x, float y, float w, float h, float alphaValue) {
   pushStyle();
   fill(getCardColor(c.type), alphaValue);
-  stroke(0, alphaValue); strokeWeight(2);
+  stroke(0, alphaValue);
+  strokeWeight(2);
   rect(x, y, w, h, 8);
 
-  fill(0, alphaValue); textSize(18); text(c.name, x + w/2, y + 25);
-  stroke(0, alphaValue * 0.25); strokeWeight(1); line(x + 8, y + 42, x + w - 8, y + 42);
+  fill(0, alphaValue);
+  textSize(18);
+  text(c.name, x + w/2, y + 25);
+  stroke(0, alphaValue * 0.25);
+  strokeWeight(1);
+  line(x + 8, y + 42, x + w - 8, y + 42);
 
   PImage img = cardImages.get(c.name);
   if (img != null && img.width > 0 && img.height > 0) {
     float scaleValue = min((w - 16) / img.width, 130.0 / img.height);
-    tint(255, alphaValue); imageMode(CENTER);
+    tint(255, alphaValue);
+    imageMode(CENTER);
     image(img, x + w/2, y + 120, img.width * scaleValue, img.height * scaleValue);
-    imageMode(CORNER); noTint();
+    imageMode(CORNER);
+    noTint();
   }
   popStyle();
 }
@@ -780,8 +907,14 @@ void drawCardEffect(Card c, float x, float y, float w, float h, float alphaValue
 void mousePressed() {
   if (gameState == 0) {
     if (mouseX >= width/2 - 150 && mouseX <= width/2 + 150) {
-      if (mouseY >= 370 && mouseY <= 430) startCountdown();
-      else if (mouseY >= 455 && mouseY <= 515) { rulePage = 0; gameState = 5; }
+      if (mouseY >= 370 && mouseY <= 430) {
+        playMp3("決定ボタンを押す22.mp3");
+        startCountdown();
+      } else if (mouseY >= 455 && mouseY <= 515) {
+        rulePage = 0;
+        gameState = 5;
+        playMp3("決定ボタンを押す22.mp3");
+      }
     }
     return;
   }
@@ -792,21 +925,25 @@ void mousePressed() {
       else if (mouseX >= width - 185 && mouseX <= width - 85) rulePage = (rulePage + 1) % RULE_PAGE_COUNT;
       else if (mouseX >= width/2 - 110 && mouseX <= width/2 + 110) gameState = 0;
     }
+    playMp3("カードをめくる.mp3");
     return;
   }
-  
+
   if (gameState == 4) {
-    if (millis() - cutinStartTime > 1000) { resetGame(); gameState = 0; }
+    if (millis() - cutinStartTime > 1000) {
+      resetGame();
+      gameState = 0;
+    }
     return;
   }
-  
+
   if (gameState != 1) return;
-  
+
   int p = activePlayer;
   float x = (p == 0) ? 25 : 655, cardY = 365;
   float cardW = 130, cardH = 310;
   float cardSpacing = (600 - 30 - (cardW * 4)) / 3;
-  
+
   for (int i = 0; i < hands[p].size(); i++) {
     float cardX = x + 15 + i * (cardW + cardSpacing);
     if (mouseX >= cardX && mouseX <= cardX + cardW && mouseY >= cardY && mouseY <= cardY + cardH) {
@@ -845,12 +982,14 @@ void keyPressed() {
   if (activePlayer == 0) {
     int idx = key - '1';
     if (idx >= 0 && idx < 4) {
-      if (key5Pressed) holdCard(0, idx); else useCard(0, idx);
+      if (key5Pressed) holdCard(0, idx);
+      else useCard(0, idx);
     }
   } else if (activePlayer == 1) {
     int idx = (key == '0') ? 3 : key - '7';
     if (idx >= 0 && idx < 4) {
-      if (keyMinusPressed) holdCard(1, idx); else useCard(1, idx);
+      if (keyMinusPressed) holdCard(1, idx);
+      else useCard(1, idx);
     }
   }
 }
@@ -862,7 +1001,7 @@ void keyReleased() {
 
 void holdCard(int p, int cardIndex) {
   if (cardIndex < 0 || cardIndex >= hands[p].size()) return;
-  
+
   Card cardInHand = hands[p].get(cardIndex);
 
   if (heldCards[p] == null) {
@@ -884,7 +1023,8 @@ void updateCombo(int p, Card c, float cardCenterX, float cardCenterY) {
   if (!isComboCategory(c.type)) return;
 
   if (lastComboType[p] == null) {
-    lastComboType[p] = c.type; comboCount[p] = 1;
+    lastComboType[p] = c.type;
+    comboCount[p] = 1;
     return;
   }
 
@@ -910,7 +1050,7 @@ void updateCombo(int p, Card c, float cardCenterX, float cardCenterY) {
 
 void useCard(int p, int cardIndex) {
   if (cardIndex < 0 || cardIndex >= hands[p].size()) return;
-
+  playMp3("カードをめくる.mp3");
   Card c = hands[p].get(cardIndex);
   int opp = 1 - p;
 
@@ -921,7 +1061,7 @@ void useCard(int p, int cardIndex) {
 
   cardEffects.add(new CardEffect(c, cardX, cardY, cardW, cardH));
   updateCombo(p, c, cardX + cardW / 2, cardY + 20);
-  
+
   if (c.type == CardType.JAM) {
     jamNoticeStartTime[opp] = millis();
     if (c.jamType == 1) {
@@ -940,10 +1080,10 @@ void useCard(int p, int cardIndex) {
     health[p] = constrain(health[p] + c.dHealth, MIN_HEALTH, MAX_HEALTH);
     stress[p] = constrain(stress[p] + c.dStress, MIN_STRESS, MAX_STRESS);
   }
-  
+
   hands[p].remove(cardIndex);
   hands[p].add(isManjaroOnly[p] ? manjaroCard : drawRandomCard(p));
-  
+
   checkInstantLoss();
 }
 
@@ -1008,8 +1148,12 @@ void drawResult() {
 
 void drawTitle() {
   background(245, 248, 252);
-  fill(35, 55, 80); textSize(60); text("ヤセルバトル", width/2, 230);
-  fill(90); textSize(18); text("健康的に目標体重を目指そう！", width/2, 290);
+  fill(35, 55, 80);
+  textSize(60);
+  text("ヤセルバトル", width/2, 230);
+  fill(90);
+  textSize(18);
+  text("健康的に目標体重を目指そう！", width/2, 290);
 
   drawMenuButton(width/2 - 150, 370, 300, 60, "ゲームスタート");
   drawMenuButton(width/2 - 150, 455, 300, 60, "ルール説明");
@@ -1017,11 +1161,14 @@ void drawTitle() {
 
 void drawMenuButton(float x, float y, float w, float h, String label) {
   boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
-  stroke(60, 90, 130); strokeWeight(2);
+  stroke(60, 90, 130);
+  strokeWeight(2);
   fill(hover ? #D2E6FA : #E6F0FA);
   rect(x, y, w, h, 12);
 
-  noStroke(); fill(35, 55, 80); textSize(22);
+  noStroke();
+  fill(35, 55, 80);
+  textSize(22);
   text(label, x + w/2, y + h/2);
 }
 
@@ -1079,7 +1226,7 @@ void drawRulePageBasic() {
     float scaleValue = min(
       imageW / ruleGameScreen.width,
       imageH / ruleGameScreen.height
-    );
+      );
 
     float drawW = ruleGameScreen.width * scaleValue;
     float drawH = ruleGameScreen.height * scaleValue;
@@ -1096,13 +1243,13 @@ void drawRulePageBasic() {
       drawY - drawH * 0.39,
       2,
       color(0, 160, 145)
-    );
+      );
     drawRuleNumberMarker(
       drawX + drawW * 0.25,
       drawY - drawH * 0.39,
       2,
       color(0, 160, 145)
-    );
+      );
 
     // ③：各PLAYERの4枚のカードを、下側のかっこでまとめて表示
     drawRuleCardBracket(
@@ -1111,14 +1258,14 @@ void drawRulePageBasic() {
       drawY + drawH * 0.43,
       3,
       color(255, 145, 40)
-    );
+      );
     drawRuleCardBracket(
       drawX + drawW * 0.04,
       drawX + drawW * 0.45,
       drawY + drawH * 0.43,
       3,
       color(255, 145, 40)
-    );
+      );
 
     // ⑤：目標体重の左横
     drawRuleNumberMarker(
@@ -1126,7 +1273,7 @@ void drawRulePageBasic() {
       drawY - drawH * 0.44,
       5,
       color(230, 80, 100)
-    );
+      );
   } else {
     fill(150);
     textSize(18);
@@ -1153,31 +1300,31 @@ void drawRulePageBasic() {
     panelX + 16, panelY + 55, panelW - 32, 46,
     1, color(66, 133, 244),
     "2人で交互にカードを使う対戦ゲームです。"
-  );
+    );
 
   drawRuleTextItem(
     panelX + 16, panelY + 105, panelW - 32, 58,
     2, color(0, 160, 145),
     "各プレイヤーは制限時間内、手札のカードを\n何枚でも使えます。"
-  );
+    );
 
   drawRuleTextItem(
     panelX + 16, panelY + 167, panelW - 32, 58,
     3, color(255, 145, 40),
     "カードを使うたびに、新しいカードが\n1枚補充されます。"
-  );
+    );
 
   drawRuleTextItem(
     panelX + 16, panelY + 229, panelW - 32, 58,
     4, color(140, 90, 200),
     "最終ターン終了後、健康値・ストレス値によって\nランダムに体重が増減します。"
-  );
+    );
 
   drawRuleTextItem(
     panelX + 16, panelY + 291, panelW - 32, 45,
     5, color(230, 80, 100),
     "目標体重により近いプレイヤーが勝利です。"
-  );
+    );
 
   // 脱落条件
   fill(255, 235, 238);
@@ -1193,7 +1340,7 @@ void drawRulePageBasic() {
     "【脱落条件】体重0kg以下 または ストレス100",
     panelX + panelW / 2,
     panelY + 355
-  );
+    );
 
   textAlign(CENTER, CENTER);
 }
@@ -1221,7 +1368,7 @@ void drawRuleNumberMarker(float x, float y, int number, color markerColor) {
 void drawRuleCardBracket(
   float leftX, float rightX, float y,
   int number, color markerColor
-) {
+  ) {
   pushStyle();
 
   stroke(markerColor);
@@ -1271,7 +1418,7 @@ void drawRuleWarningMarker(float x, float y) {
 void drawRuleTextItem(
   float x, float y, float w, float h,
   int number, color markerColor, String message
-) {
+  ) {
   pushStyle();
 
   fill(255);
@@ -1355,7 +1502,7 @@ void drawRulePageCombo() {
     -2, 10, -5,
     CardType.MEAL,
     100, cardY, cardW, cardH
-  );
+    );
 
   drawRuleArrow(252, 257);
 
@@ -1364,7 +1511,7 @@ void drawRulePageCombo() {
     1, 15, 0,
     CardType.MEAL,
     310, cardY, cardW, cardH
-  );
+    );
 
   drawRuleArrow(462, 257);
 
@@ -1373,7 +1520,7 @@ void drawRulePageCombo() {
     8, -5, -25,
     CardType.MEAL,
     520, cardY, cardW, cardH
-  );
+    );
 
   // 同じカテゴリー＝同じ背景色
   fill(getCardColor(CardType.MEAL));
@@ -1443,7 +1590,7 @@ void drawRuleGameStyleCard(
   CardType category,
   float x, float y,
   float w, float h
-) {
+  ) {
   pushStyle();
 
   fill(getCardColor(category));
@@ -1469,7 +1616,7 @@ void drawRuleGameStyleCard(
     float scaleValue = min(
       maxImageW / ruleCardImage.width,
       maxImageH / ruleCardImage.height
-    );
+      );
 
     imageMode(CENTER);
     image(
@@ -1478,7 +1625,7 @@ void drawRuleGameStyleCard(
       y + 101,
       ruleCardImage.width * scaleValue,
       ruleCardImage.height * scaleValue
-    );
+      );
     imageMode(CORNER);
   } else {
     fill(120);
@@ -1499,7 +1646,7 @@ void drawRuleGameStyleCard(
       "体重：" + (dTaiju > 0 ? "+" : "") + dTaiju,
       x + w / 2,
       effectY + lineCount * lineHeight
-    );
+      );
     lineCount++;
   }
 
@@ -1509,7 +1656,7 @@ void drawRuleGameStyleCard(
       "健康：" + (dHealth > 0 ? "+" : "") + dHealth,
       x + w / 2,
       effectY + lineCount * lineHeight
-    );
+      );
     lineCount++;
   }
 
@@ -1519,7 +1666,7 @@ void drawRuleGameStyleCard(
       "ストレス：" + (dStress > 0 ? "+" : "") + dStress,
       x + w / 2,
       effectY + lineCount * lineHeight
-    );
+      );
   }
 
   popStyle();
@@ -1586,19 +1733,19 @@ void drawRulePageSpecialAndControls() {
     "リフレッシュ", "refresh.png",
     0, 10, -10,
     105 + cardShiftX, 175, 135, 185
-  );
+    );
 
   drawRuleSpecialCard(
     "チートデイ", "cheat_day.png",
     12, -30, -20,
     265 + cardShiftX, 175, 135, 185
-  );
+    );
 
   drawRuleSpecialCard(
     "マンジャロ", "manjaro.png",
     -30, -30, 70,
     425 + cardShiftX, 175, 135, 185
-  );
+    );
 
   // 妨害カード
   fill(110, 50, 130);
@@ -1609,19 +1756,19 @@ void drawRulePageSpecialAndControls() {
     "ご飯を奢る", "meal_jam.png",
     "相手の体重を増加",
     680 + cardShiftX, 175, 135, 185
-  );
+    );
 
   drawRuleJamCard(
     "睡眠薬", "sleep_jam.png",
     "相手の次ターンを\n5秒に短縮",
     840 + cardShiftX, 175, 135, 185
-  );
+    );
 
   drawRuleJamCard(
     "マンジャロ注文", "manjaro_jam.png",
     "相手の次の手札を\nマンジャロに固定",
     1000 + cardShiftX, 175, 135, 185
-  );
+    );
 
   // 下段：数字キーを横一列に表示
   fill(238, 242, 248);
@@ -1642,7 +1789,7 @@ void drawRulePageSpecialAndControls() {
     "カード使用：対応する数字キーを押す　　HOLD入れ替え：HOLDキーを押しながらカードキーを押す",
     width / 2,
     554
-  );
+    );
 
   textAlign(CENTER, CENTER);
 }
@@ -1688,7 +1835,7 @@ void drawRuleKeyboardRow(float startX, float y) {
     "PLAYER 1",
     color(210, 70, 85),
     keyW, gap
-  );
+    );
 
   // PLAYER 1 HOLD：5キー
   float p1HoldX = startX + 4 * (keyW + gap);
@@ -1696,7 +1843,7 @@ void drawRuleKeyboardRow(float startX, float y) {
     p1HoldX, y + keyH + 5, keyW,
     "P1",
     color(210, 70, 85)
-  );
+    );
 
   // PLAYER 2：7～0キーをまとめる
   float p2Left = startX + 6 * (keyW + gap);
@@ -1706,7 +1853,7 @@ void drawRuleKeyboardRow(float startX, float y) {
     "PLAYER 2",
     color(55, 135, 210),
     keyW, gap
-  );
+    );
 
   // PLAYER 2 HOLD：-キー
   float p2HoldX = startX + 10 * (keyW + gap);
@@ -1714,7 +1861,7 @@ void drawRuleKeyboardRow(float startX, float y) {
     p2HoldX, y + keyH + 5, keyW,
     "P2",
     color(55, 135, 210)
-  );
+    );
 }
 
 
@@ -1727,7 +1874,7 @@ void drawRulePlayerKeyGuide(
   color guideColor,
   float keyW,
   float gap
-) {
+  ) {
   pushStyle();
 
   // キーをまとめる下側のかっこ
@@ -1763,7 +1910,7 @@ void drawRuleHoldKeyGuide(
   float keyW,
   String playerLabel,
   color guideColor
-) {
+  ) {
   pushStyle();
 
   stroke(guideColor);
@@ -1791,7 +1938,7 @@ void drawRuleSpecialCard(
   int dStress,
   float x, float y,
   float w, float h
-) {
+  ) {
   pushStyle();
 
   fill(getCardColor(CardType.SPECIAL));
@@ -1823,7 +1970,7 @@ void drawRuleSpecialCard(
       "体重：" + (dTaiju > 0 ? "+" : "") + dTaiju,
       x + w / 2,
       effectY + lineCount * lineHeight
-    );
+      );
     lineCount++;
   }
 
@@ -1833,7 +1980,7 @@ void drawRuleSpecialCard(
       "健康：" + (dHealth > 0 ? "+" : "") + dHealth,
       x + w / 2,
       effectY + lineCount * lineHeight
-    );
+      );
     lineCount++;
   }
 
@@ -1843,7 +1990,7 @@ void drawRuleSpecialCard(
       "ストレス：" + (dStress > 0 ? "+" : "") + dStress,
       x + w / 2,
       effectY + lineCount * lineHeight
-    );
+      );
   }
 
   popStyle();
@@ -1858,7 +2005,7 @@ void drawRuleJamCard(
   String effectText,
   float x, float y,
   float w, float h
-) {
+  ) {
   pushStyle();
 
   fill(getCardColor(CardType.JAM));
@@ -1905,7 +2052,7 @@ void drawRulePage3Image(
   float centerY,
   float maxW,
   float maxH
-) {
+  ) {
   if (img == null || img.width <= 0 || img.height <= 0) {
     fill(120);
     textSize(11);
@@ -1916,7 +2063,7 @@ void drawRulePage3Image(
   float scaleValue = min(
     maxW / img.width,
     maxH / img.height
-  );
+    );
 
   imageMode(CENTER);
   image(
@@ -1925,17 +2072,67 @@ void drawRulePage3Image(
     centerY,
     img.width * scaleValue,
     img.height * scaleValue
-  );
+    );
   imageMode(CORNER);
 }
 
 
 void drawRuleButton(float x, float y, float w, float h, String label) {
   boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
-  stroke(80, 110, 145); strokeWeight(2);
+  stroke(80, 110, 145);
+  strokeWeight(2);
   fill(hover ? #CDE1F5 : #E1EEFA);
   rect(x, y, w, h, 10);
 
-  noStroke(); fill(35, 55, 80); textSize(16);
+  noStroke();
+  fill(35, 55, 80);
+  textSize(16);
   text(label, x + w/2, y + h/2);
+}
+
+void playMp3(String fileName) {
+  // すでに再生中の音があれば停止
+  if (sound != null && sound.isPlaying()) {
+    sound.stop();
+  }
+
+  // 新しい音声ファイルを読み込んで再生
+  sound = new SoundFile(this, fileName);
+  sound.play();
+}
+/**
+ * BGMをループ再生する関数
+ * @param fileName dataフォルダ内のBGMファイル名
+ * @param volume 音量（0.0 ～ 1.0）
+ */
+void playBgm(String fileName, float volume) {
+  // すでにBGMが鳴っていれば停止
+  if (bgmSound != null && bgmSound.isPlaying()) {
+    bgmSound.stop();
+  }
+
+  bgmVolume = constrain(volume, 0.0, 1.0); // 0.0～1.0の範囲に収める
+  bgmSound = new SoundFile(this, fileName);
+  bgmSound.amp(bgmVolume); // 音量を設定
+  bgmSound.loop();         // ループ再生を開始
+}
+
+/**
+ * 再生中のBGMの音量を後から変更する関数
+ * @param volume 音量（0.0 ～ 1.0）
+ */
+void setBgmVolume(float volume) {
+  bgmVolume = constrain(volume, 0.0, 1.0);
+  if (bgmSound != null) {
+    bgmSound.amp(bgmVolume);
+  }
+}
+
+/**
+ * BGMを停止する関数
+ */
+void stopBgm() {
+  if (bgmSound != null && bgmSound.isPlaying()) {
+    bgmSound.stop();
+  }
 }
