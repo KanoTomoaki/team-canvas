@@ -19,6 +19,7 @@ float CUTIN_DURATION = 1.2;
 float EVENT_DURATION = 3.5;
 float JAM_NOTICE_DURATION = 2.0;
 float COUNTDOWN_DURATION = 3.0;
+float FLASH_DURATION = 1.5; // ★点滅演出の長さ（秒）
 int TARGET_TAIJU_MIN = 30, TARGET_TAIJU_MAX = 80;
 
 // --- カード排出率の設定（%） ---
@@ -49,6 +50,12 @@ int[] health = new int[2];
 int[] stress = new int[2];
 float[] turnTimeLimit = new float[2];
 boolean[] isManjaroOnly = new boolean[2];
+
+// ★点滅演出用変数
+boolean isFlashing = false;
+int flashStartTime = 0;
+int flashTargetPlayer = -1; // 0: P1, 1: P2, 2: 両方
+String flashType = "";      // "STRESS" or "TAIJU"
 
 // ホールドカード保存用 [0]: P1, [1]: P2
 Card[] heldCards = new Card[2];
@@ -87,16 +94,11 @@ HashMap<Integer, PImage> player1Images = new HashMap<Integer, PImage>();
 HashMap<Integer, PImage> player2Images = new HashMap<Integer, PImage>();
 
 // エンディング画像
-PImage endingp1skinny;
-PImage endingp2skinny;
-PImage endingp1normal;
-PImage endingp2normal;
-PImage endingp1fat;
-PImage endingp2fat;
-PImage endingp1stress;
-PImage endingp2stress;
-PImage endingp1weight0;
-PImage endingp2weight0;
+PImage endingp1skinny, endingp2skinny;
+PImage endingp1normal, endingp2normal;
+PImage endingp1fat, endingp2fat;
+PImage endingp1stress, endingp2stress;
+PImage endingp1weight0, endingp2weight0;
 PImage endingdraw;
 
 // ルール説明1ページ目に表示するゲーム画面スクショ
@@ -383,8 +385,8 @@ void initCardPool() {
   cardPool.add(new Card("ご飯を奢る", CardType.JAM, 1));
   cardPool.add(new Card("睡眠薬", CardType.JAM, 2));
   cardPool.add(new Card("マンジャロ注文", CardType.JAM, 3));
-  cardPool.add(new Card("イタズラ電話", CardType.JAM, 4));      // 追加
-  cardPool.add(new Card("ストレスリバーサー", CardType.JAM, 5)); // 追加
+  cardPool.add(new Card("イタズラ電話", CardType.JAM, 4));
+  cardPool.add(new Card("ストレスリバーサー", CardType.JAM, 5));
 }
 
 void resetGame() {
@@ -395,6 +397,7 @@ void resetGame() {
   keyMinusPressed = false;
   isDragging = false;
   draggedCardIndex = -1;
+  isFlashing = false;
 
   cardEffects.clear();
   comboEffects.clear();
@@ -447,21 +450,21 @@ Card drawRandomCard(int p) {
   if (r < sum) return manjaroCard;
 
   sum += JAM_MEAL_RATE;
-  if (r < sum) return cardPool.get(11); // ご飯を奢る
+  if (r < sum) return cardPool.get(11);
 
   sum += JAM_SLEEP_RATE;
-  if (r < sum) return cardPool.get(12); // 睡眠薬
+  if (r < sum) return cardPool.get(12);
 
   sum += JAM_MANJARO_RATE;
-  if (r < sum) return cardPool.get(13); // マンジャロ注文
+  if (r < sum) return cardPool.get(13);
 
   sum += JAM_PHONE_RATE;
-  if (r < sum) return cardPool.get(14); // イタズラ電話
+  if (r < sum) return cardPool.get(14);
 
   sum += JAM_REVERSER_RATE;
-  if (r < sum) return cardPool.get(15); // ストレスリバーサー
+  if (r < sum) return cardPool.get(15);
 
-  return cardPool.get((int)random(0, 11)); // 通常カード (0 ~ 10)
+  return cardPool.get((int)random(0, 11));
 }
 
 // ==========================================
@@ -479,6 +482,11 @@ void draw() {
     else if (gameState == 2) updateCutin();
     else if (gameState == 3) updateRandomEventCutin();
     else if (gameState == 4) drawResult();
+  }
+
+  // 点滅更新処理
+  if (isFlashing) {
+    updateFlashing();
   }
 
   for (int i = cardEffects.size() - 1; i >= 0; i--) {
@@ -517,7 +525,19 @@ void updateCountdownCutin() {
 }
 
 void updateTurn() {
-  if ((millis() - turnStartTime) * 0.001 >= turnTimeLimit[activePlayer]) endTurn();
+  if (!isFlashing && (millis() - turnStartTime) * 0.001 >= turnTimeLimit[activePlayer]) {
+    endTurn();
+  }
+}
+
+// ★点滅アニメーション中の処理
+void updateFlashing() {
+  float elapsed = (millis() - flashStartTime) * 0.001;
+  if (elapsed >= FLASH_DURATION) {
+    isFlashing = false;
+    gameState = 4; // リザルト画面に遷移
+    cutinStartTime = millis(); // リザルト画面の即時連打防止タイマー用
+  }
 }
 
 void endTurn() {
@@ -601,12 +621,25 @@ void updateRandomEventCutin() {
   }
 }
 
+// ★即時敗北の検知と点滅アニメーションの開始
 boolean checkInstantLoss() {
-  for (int i = 0; i < 2; i++) {
-    if (taiju[i] <= 0 || stress[i] >= MAX_STRESS) {
-      gameState = 4;
-      return true;
-    }
+  if (isFlashing) return true;
+
+  boolean p1StressOver = stress[0] >= MAX_STRESS;
+  boolean p2StressOver = stress[1] >= MAX_STRESS;
+  boolean p1WeightZero = taiju[0] <= 0;
+  boolean p2WeightZero = taiju[1] <= 0;
+
+  if (p1StressOver || p2StressOver || p1WeightZero || p2WeightZero) {
+    isFlashing = true;
+    flashStartTime = millis();
+
+    if ((p1StressOver && p2StressOver) || (p1WeightZero && p2WeightZero)) flashTargetPlayer = 2; // 両方
+    else if (p1StressOver || p1WeightZero) flashTargetPlayer = 0;
+    else flashTargetPlayer = 1;
+
+    flashType = (p1StressOver || p2StressOver) ? "STRESS" : "TAIJU";
+    return true;
   }
   return false;
 }
@@ -645,7 +678,7 @@ void drawPlayerPanel(int p, float x, float y, float w, float h) {
   fill(220);
   rect(x + timeBarMargin, timeBarY, timeBarW, timeBarH, 4);
 
-  if (isActive) {
+  if (isActive && !isFlashing) {
     float elapsed = (millis() - turnStartTime) * 0.001;
     float remaining = max(0, turnTimeLimit[activePlayer] - elapsed);
     fill(255, 70, 70);
@@ -789,6 +822,7 @@ void drawCurrentHorizontalBarGraph(int p, float gx, float gy, float gw, float gh
   line(targetX, gy + 2, targetX, gy + gh - 2);
   noStroke();
 
+  // 体重バー
   if (currentTurn >= 4) {
     fill(200);
     rect(barX, gy + 32, barW, barH, 4);
@@ -800,7 +834,13 @@ void drawCurrentHorizontalBarGraph(int p, float gx, float gy, float gw, float gh
     fill(80);
     text("体重: ??? kg", barX + 8, gy + 32 + barH/2);
   } else {
-    fill(60);
+    // 点滅チェック（体重）
+    if (isFlashing && (flashTargetPlayer == p || flashTargetPlayer == 2) && flashType.equals("TAIJU")) {
+      float blink = abs(sin(frameCount * 0.2));
+      fill(lerpColor(color(220, 60, 60), color(255, 255, 255), blink));
+    } else {
+      fill(60);
+    }
     rect(barX, gy + 32, map(constrain(taiju[p], 0, 150), 0, 150, 0, barW), barH, 4);
     textAlign(LEFT, CENTER);
     textSize(12);
@@ -808,19 +848,27 @@ void drawCurrentHorizontalBarGraph(int p, float gx, float gy, float gw, float gh
     text("体重: " + taiju[p] + " kg", barX + 8, gy + 32 + barH/2);
   }
 
+  // 健康バー
   fill(40, 180, 70);
   rect(barX, gy + 86, map(constrain(health[p], 0, 100), 0, 100, 0, barW), barH, 4);
-  fill(220, 60, 60);
+
+  // ★ストレスバー（点滅演出の適用）
+  if (isFlashing && (flashTargetPlayer == p || flashTargetPlayer == 2) && flashType.equals("STRESS")) {
+    float blink = abs(sin(frameCount * 0.25)); // 点滅速度
+    fill(lerpColor(color(220, 60, 60), color(255, 255, 255), blink));
+  } else {
+    fill(220, 60, 60);
+  }
   rect(barX, gy + 140, map(constrain(stress[p], 0, 100), 0, 100, 0, barW), barH, 4);
 
   fill(160, 120, 0);
-  textSize(11);
+  textSize(14);
   textAlign(CENTER, CENTER);
-  text("目標:" + targetTaiju + "kg", targetX, gy + 14);
+  text("目標:" + targetTaiju + "kg", targetX, gy + 16);
 
   textAlign(LEFT, CENTER);
   textSize(12);
-  fill(255);
+  fill(isFlashing && (flashTargetPlayer == p || flashTargetPlayer == 2) && flashType.equals("STRESS") ? 0 : 255);
   text("健康: " + health[p] + " %", barX + 8, gy + 86 + barH/2);
   text("ストレス: " + stress[p] + " %", barX + 8, gy + 140 + barH/2);
   textAlign(CENTER, CENTER);
@@ -939,7 +987,7 @@ void mousePressed() {
     return;
   }
 
-  if (gameState != 1) return;
+  if (gameState != 1 || isFlashing) return;
 
   int p = activePlayer;
   float x = (p == 0) ? 25 : 655, cardY = 365;
@@ -959,7 +1007,7 @@ void mousePressed() {
 }
 
 void mouseReleased() {
-  if (gameState != 1 || !isDragging) return;
+  if (gameState != 1 || !isDragging || isFlashing) return;
 
   int p = activePlayer;
   float holdX = ((p == 0) ? 25 : 655) + 490;
@@ -979,7 +1027,7 @@ void keyPressed() {
   if (key == '5') key5Pressed = true;
   if (key == '-') keyMinusPressed = true;
 
-  if (gameState != 1) return;
+  if (gameState != 1 || isFlashing) return;
 
   if (activePlayer == 0) {
     int idx = key - '1';
@@ -1076,10 +1124,10 @@ void useCard(int p, int cardIndex) {
     } else if (c.jamType == 3) {
       isManjaroOnly[opp] = true;
       jamNoticeMessage[opp] = "「マンジャロを勝手に注文された!」\n次ターン全カード激痛化!";
-    } else if (c.jamType == 4) { // イタズラ電話
+    } else if (c.jamType == 4) {
       stress[opp] = constrain(stress[opp] + 20, MIN_STRESS, MAX_STRESS);
       jamNoticeMessage[opp] = "「イタズラ電話がかかってきた!」\nストレス +20";
-    } else if (c.jamType == 5) { // ストレスリバーサー
+    } else if (c.jamType == 5) {
       int tempStress = stress[p];
       stress[p] = stress[opp];
       stress[opp] = tempStress;
