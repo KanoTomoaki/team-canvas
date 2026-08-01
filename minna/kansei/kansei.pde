@@ -27,8 +27,8 @@ float MANJARO_RATE = 6.0;
 float JAM_MEAL_RATE = 3.0;
 float JAM_SLEEP_RATE = 2.0;
 float JAM_MANJARO_RATE = 1.0;
-float JAM_PHONE_RATE = 2.0;    // イタズラ電話の排出率
-float JAM_REVERSER_RATE = 2.0; // ストレスリバーサーの排出率
+float JAM_PHONE_RATE = 1.0;    // イタズラ電話の排出率
+float JAM_REVERSER_RATE = 1.0; // ストレスリバーサーの排出率
 
 // --- カード使用演出の設定 ---
 float CARD_EFFECT_DURATION = 0.3;
