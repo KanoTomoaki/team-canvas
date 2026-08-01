@@ -105,6 +105,9 @@ PImage endingdraw;
 String RULE_GAME_SCREEN_FILE = "rule_game_screen.png";
 PImage ruleGameScreen;
 
+// タイトル画面のロゴ画像
+PImage titleLogo;
+
 // ==========================================
 // 構造体・クラス定義
 // ==========================================
@@ -212,6 +215,7 @@ void setup() {
   loadEndingImages();
 
   ruleGameScreen = loadImage(RULE_GAME_SCREEN_FILE);
+  titleLogo = loadImage("title_logo.png");
 
   hands[0] = new ArrayList<Card>();
   hands[1] = new ArrayList<Card>();
@@ -1200,16 +1204,30 @@ void drawResult() {
 }
 
 void drawTitle() {
-  background(245, 248, 252);
-  fill(35, 55, 80);
-  textSize(60);
-  text("ヤセルバトル", width/2, 230);
-  fill(90);
-  textSize(18);
-  text("健康的に目標体重を目指そう！", width/2, 290);
+  background(200, 200, 200);
 
-  drawMenuButton(width/2 - 150, 370, 300, 60, "ゲームスタート");
-  drawMenuButton(width/2 - 150, 455, 300, 60, "ルール説明");
+  // タイトルロゴを表示
+  if (titleLogo != null && titleLogo.width > 0 && titleLogo.height > 0) {
+    imageMode(CENTER);
+
+    float scaleValue = min(
+      700.0 / titleLogo.width,
+      260.0 / titleLogo.height
+    );
+
+    image(
+      titleLogo,
+      width / 2,
+      220,
+      titleLogo.width * scaleValue,
+      titleLogo.height * scaleValue
+    );
+
+    imageMode(CORNER);
+  }
+
+  drawMenuButton(width / 2 - 150, 370, 300, 60, "ゲームスタート");
+  drawMenuButton(width / 2 - 150, 455, 300, 60, "ルール説明");
 }
 
 void drawMenuButton(float x, float y, float w, float h, String label) {
