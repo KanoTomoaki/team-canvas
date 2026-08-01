@@ -1206,13 +1206,16 @@ void drawResult() {
 void drawTitle() {
   background(200, 200, 200);
 
+  // タイトル画面の左右にゲーム内カードを散りばめる
+  drawTitleCardDecoration();
+
   // タイトルロゴを表示
   if (titleLogo != null && titleLogo.width > 0 && titleLogo.height > 0) {
     imageMode(CENTER);
 
     float scaleValue = min(
-      700.0 / titleLogo.width,
-      260.0 / titleLogo.height
+      800.0 / titleLogo.width,
+      360.0 / titleLogo.height
     );
 
     image(
@@ -1228,6 +1231,53 @@ void drawTitle() {
 
   drawMenuButton(width / 2 - 150, 370, 300, 60, "ゲームスタート");
   drawMenuButton(width / 2 - 150, 455, 300, 60, "ルール説明");
+}
+
+// タイトル画面のカード装飾
+void drawTitleCardDecoration() {
+  pushStyle();
+
+  // 左側
+  drawTitleCardImage("サラダ", 105, 120, 105, 145, -0.20);
+  drawTitleCardImage("ウォーキング", 205, 285, 110, 150, 0.16);
+  drawTitleCardImage("マンジャロ", 95, 475, 105, 145, -0.12);
+  drawTitleCardImage("睡眠", 230, 610, 100, 140, 0.22);
+
+  // 右側
+  drawTitleCardImage("ケーキ", width - 105, 120, 105, 145, 0.20);
+  drawTitleCardImage("ジム", width - 205, 285, 110, 150, -0.16);
+  drawTitleCardImage("チートデイ", width - 95, 475, 105, 145, 0.12);
+  drawTitleCardImage("イタズラ電話", width - 230, 610, 100, 140, -0.22);
+
+  popStyle();
+}
+
+// カード画像を回転させて表示
+void drawTitleCardImage(String cardName, float centerX, float centerY,
+                        float maxW, float maxH, float angle) {
+  PImage img = cardImages.get(cardName);
+  if (img == null || img.width <= 0 || img.height <= 0) return;
+
+  float scaleValue = min(maxW / img.width, maxH / img.height);
+  float drawW = img.width * scaleValue;
+  float drawH = img.height * scaleValue;
+
+  pushMatrix();
+  translate(centerX, centerY);
+  rotate(angle);
+
+  imageMode(CENTER);
+
+  // カード画像の影
+  tint(0, 70);
+  image(img, 7, 9, drawW, drawH);
+
+  // カード本体
+  noTint();
+  image(img, 0, 0, drawW, drawH);
+
+  imageMode(CORNER);
+  popMatrix();
 }
 
 void drawMenuButton(float x, float y, float w, float h, String label) {
